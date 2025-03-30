@@ -1,4 +1,4 @@
-class Template < Formula
+class HomebrewTemplate < Formula
   # GitHub repository information
   GITHUB_USER = "griffin928"
   GITHUB_REPO = "homebrew-template"
