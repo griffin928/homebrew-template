@@ -7,10 +7,13 @@ FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="homebrew-template"
 GITHUB_USER="griffin928"
 GITHUB_REPO="homebrew-template"
+VERSION="@@VERSION@@"
 
 # 获取当前版本号
 get_current_version() {
-    if [ -f "$FORMULA_FILE" ]; then
+    if [ "$VERSION" != "@@VERSION@@" ]; then
+        echo "$VERSION"
+    elif [ -f "$FORMULA_FILE" ]; then
         grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2
     else
         echo "unknown"
@@ -75,18 +78,21 @@ publish() {
     fi
 
     # 获取新版本号
-    VERSION=$(get_next_version)
-    echo "Publishing version $VERSION..."
+    NEW_VERSION=$(get_next_version)
+    echo "Publishing version $NEW_VERSION..."
 
     # 更新 formula 文件中的版本号
-    sed -i '' "s/VERSION = \".*\"/VERSION = \"$VERSION\"/" "$FORMULA_FILE"
+    sed -i '' "s/VERSION = \".*\"/VERSION = \"$NEW_VERSION\"/" "$FORMULA_FILE"
+
+    # 更新脚本中的版本号占位符
+    sed -i '' "s/VERSION=\"@@VERSION@@\"/VERSION=\"$NEW_VERSION\"/" "$0"
 
     # 提交版本更新
-    git add "$FORMULA_FILE"
-    git commit -m "chore: Bump version to $VERSION"
+    git add "$FORMULA_FILE" "$0"
+    git commit -m "chore: Bump version to $NEW_VERSION"
     
     # 创建新的 tag
-    git tag "$VERSION"
+    git tag "$NEW_VERSION"
     
     # 推送更改和标签
     git push && git push --tags
@@ -96,17 +102,17 @@ publish() {
     sleep 5
     
     # 获取 GitHub 生成的压缩包的 SHA256
-    SHA256=$(get_github_archive_sha256 "$VERSION")
+    SHA256=$(get_github_archive_sha256 "$NEW_VERSION")
     
     # 更新 formula 文件中的 SHA256
     sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$FORMULA_FILE"
 
     # 提交 SHA256 更新
     git add "$FORMULA_FILE"
-    git commit -m "chore: Update SHA256 for version $VERSION"
+    git commit -m "chore: Update SHA256 for version $NEW_VERSION"
     git push
 
-    echo "Version $VERSION published successfully!"
+    echo "Version $NEW_VERSION published successfully!"
     echo "SHA256: $SHA256"
 }
 
