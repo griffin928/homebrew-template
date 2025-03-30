@@ -7,7 +7,7 @@ class HomebrewTemplate < Formula
   desc "My personal CLI tool for daily automation"
   homepage "https://github.com/#{GITHUB_USER}/#{GITHUB_REPO}"
   url "#{homepage}/archive/refs/tags/#{VERSION}.tar.gz"
-  sha256 "2ea6c50200969d1294f199eb54b1365dd2995b6a8400fe295fd06ec36c20a8be"
+  sha256 "3972dcadf32ed78b1a131f1fb270d9eb4aca86fa0a6a02fe56a8408516432235"
   license "MIT"
 
   def install
