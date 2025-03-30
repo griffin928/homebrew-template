@@ -1,24 +1,26 @@
 #!/bin/sh
 
-# 仓库名称配置
-REPO_NAME="homebrew-template"
+# 工具名称配置
+GITHUB_USER="griffin928"
+TOOL_NAME="template"
 
 # 配置
-REPO_URL="https://github.com/griffin928/${REPO_NAME}.git"
-WORK_DIR="$HOME/.brewtoolname"
+REPO_NAME="homebrew-${TOOL_NAME}"
+REPO_URL="https://github.com/${GITHUB_USER}/${REPO_NAME}.git"
+WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="${REPO_NAME}.rb"
 PACKAGE_NAME="${REPO_NAME}"
-GITHUB_USER="griffin928"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.6"
+VERSION="v1.0.7"
 
 # 显示帮助信息
 show_help() {
-    echo "Usage: template [command]"
+    echo "Usage: ${TOOL_NAME} [command]"
     echo ""
     echo "Commands:"
     echo "  dev         Clone/update repository for development"
     echo "  publish     Publish a new version (auto-incrementing)"
+    echo "  upgrade    Force upgrade to the latest version"
     echo "  -v         Show version"
     echo "  -h         Show this help message"
 }
@@ -46,7 +48,24 @@ dev() {
         cd "$WORK_DIR" && git pull
         echo "Repository updated"
     fi
-    echo "You can now develop the template in: $WORK_DIR"
+    echo "You can now develop the ${TOOL_NAME} in: $WORK_DIR"
+}
+
+# 强制升级到最新版本
+upgrade() {
+    echo "Upgrading ${TOOL_NAME} to the latest version..."
+    
+    # 先卸载现有版本
+    brew untap "${GITHUB_USER}/${TOOL_NAME}" 2>/dev/null || true
+    
+    # 重新添加 tap
+    brew tap "${GITHUB_USER}/${TOOL_NAME}" "https://github.com/${GITHUB_USER}/${REPO_NAME}.git"
+    
+    # 安装最新版本
+    brew install "${GITHUB_USER}/${TOOL_NAME}/${PACKAGE_NAME}"
+    
+    # 显示新版本
+    echo "Current version: $(${TOOL_NAME} -v)"
 }
 
 # 获取下一个版本号
@@ -137,6 +156,9 @@ case "$1" in
         ;;
     "publish")
         publish
+        ;;
+    "upgrade")
+        upgrade
         ;;
     "-v"|"--version")
         echo "$(get_current_version)"
