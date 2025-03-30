@@ -8,6 +8,15 @@ PACKAGE_NAME="homebrew-template"
 GITHUB_USER="griffin928"
 GITHUB_REPO="homebrew-template"
 
+# 获取当前版本号
+get_current_version() {
+    if [ -f "$FORMULA_FILE" ]; then
+        grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2
+    else
+        echo "unknown"
+    fi
+}
+
 # 命令处理函数
 dev() {
     if [ ! -d "$WORK_DIR" ]; then
@@ -26,7 +35,7 @@ dev() {
 # 获取下一个版本号
 get_next_version() {
     # 从 formula 文件中获取当前版本号
-    CURRENT_VERSION=$(grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2)
+    CURRENT_VERSION=$(get_current_version)
     
     # 提取版本号的各个部分
     MAJOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f1 | tr -d 'v')
@@ -109,14 +118,18 @@ case "$1" in
     "publish")
         publish
         ;;
+    "-v"|"--version")
+        echo "$(get_current_version)"
+        ;;
     "")
         echo "Hello from template CLI tool!"
         ;;
     *)
         echo "Unknown command: $1"
         echo "Available commands:"
-        echo "  dev     - Clone/update repository for development"
-        echo "  publish - Publish a new version (auto-incrementing)"
-        echo "  (none)  - Show welcome message"
+        echo "  dev         - Clone/update repository for development"
+        echo "  publish     - Publish a new version (auto-incrementing)"
+        echo "  -v         - Show version"
+        echo "  (none)      - Show welcome message"
         ;;
 esac
