@@ -4,6 +4,7 @@
 REPO_URL="https://github.com/griffin928/homebrew-template.git"
 WORK_DIR="$HOME/.brewtoolname"
 FORMULA_FILE="homebrew-template.rb"
+PACKAGE_NAME="homebrew-template"
 
 # 命令处理函数
 dev() {
@@ -55,8 +56,8 @@ publish() {
     git tag "$VERSION"
 
     # 生成新的压缩包和 SHA256
-    tar_name="template-${VERSION}.tar.gz"
-    git archive --format=tar.gz --prefix=template-${VERSION}/ HEAD > "$tar_name"
+    tar_name="${PACKAGE_NAME}-${VERSION}.tar.gz"
+    git archive --format=tar.gz --prefix=${PACKAGE_NAME}-${VERSION}/ HEAD > "$tar_name"
     SHA256=$(shasum -a 256 "$tar_name" | cut -d' ' -f1)
     rm "$tar_name"
 
