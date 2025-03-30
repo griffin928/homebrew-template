@@ -7,7 +7,7 @@ FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="homebrew-template"
 GITHUB_USER="griffin928"
 GITHUB_REPO="homebrew-template"
-VERSION="@@VERSION@@"
+VERSION="v1.0.5"
 
 # 获取当前版本号
 get_current_version() {
