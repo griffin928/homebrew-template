@@ -1,13 +1,16 @@
 #!/bin/sh
 
+# 仓库名称配置
+REPO_NAME="homebrew-template"
+
 # 配置
-REPO_URL="https://github.com/griffin928/homebrew-template.git"
+REPO_URL="https://github.com/griffin928/${REPO_NAME}.git"
 WORK_DIR="$HOME/.brewtoolname"
-FORMULA_FILE="homebrew-template.rb"
-PACKAGE_NAME="homebrew-template"
+FORMULA_FILE="${REPO_NAME}.rb"
+PACKAGE_NAME="${REPO_NAME}"
 GITHUB_USER="griffin928"
-GITHUB_REPO="homebrew-template"
-VERSION="v1.0.5"
+GITHUB_REPO="${REPO_NAME}"
+VERSION="v1.0.6"
 
 # 显示帮助信息
 show_help() {
