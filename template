@@ -1,2 +1,93 @@
 #!/bin/sh
-echo "Hello from template CLI tool!"
+
+# 配置
+REPO_URL="https://github.com/griffin928/homebrew-template.git"
+WORK_DIR="$HOME/.brewtoolname"
+FORMULA_FILE="homebrew-template.rb"
+
+# 命令处理函数
+dev() {
+    if [ ! -d "$WORK_DIR" ]; then
+        echo "Creating development directory: $WORK_DIR"
+        mkdir -p "$WORK_DIR"
+        git clone "$REPO_URL" "$WORK_DIR"
+        echo "Repository cloned to $WORK_DIR"
+    else
+        echo "Development directory already exists: $WORK_DIR"
+        cd "$WORK_DIR" && git pull
+        echo "Repository updated"
+    fi
+    echo "You can now develop the template in: $WORK_DIR"
+}
+
+# 获取下一个版本号
+get_next_version() {
+    # 从 formula 文件中获取当前版本号
+    CURRENT_VERSION=$(grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2)
+    
+    # 提取版本号的各个部分
+    MAJOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f1 | tr -d 'v')
+    MINOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f2)
+    PATCH=$(echo "$CURRENT_VERSION" | cut -d'.' -f3)
+    
+    # 增加补丁版本号
+    NEW_PATCH=$((PATCH + 1))
+    
+    # 返回新版本号
+    echo "v$MAJOR.$MINOR.$NEW_PATCH"
+}
+
+publish() {
+    # 确保在正确的目录
+    if [ ! -f "$FORMULA_FILE" ]; then
+        echo "Error: $FORMULA_FILE not found. Please run this command in the repository root."
+        return 1
+    fi
+
+    # 获取新版本号
+    VERSION=$(get_next_version)
+    echo "Publishing version $VERSION..."
+
+    # 更新 formula 文件中的版本号
+    sed -i '' "s/VERSION = \".*\"/VERSION = \"$VERSION\"/" "$FORMULA_FILE"
+
+    # 创建新的 tag
+    git tag "$VERSION"
+
+    # 生成新的压缩包和 SHA256
+    tar_name="template-${VERSION}.tar.gz"
+    git archive --format=tar.gz --prefix=template-${VERSION}/ HEAD > "$tar_name"
+    SHA256=$(shasum -a 256 "$tar_name" | cut -d' ' -f1)
+    rm "$tar_name"
+
+    # 更新 formula 文件中的 SHA256
+    sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$FORMULA_FILE"
+
+    # 提交更改
+    git add "$FORMULA_FILE"
+    git commit -m "chore: Bump version to $VERSION"
+    git push && git push --tags
+
+    echo "Version $VERSION published successfully!"
+    echo "SHA256: $SHA256"
+}
+
+# 主命令处理
+case "$1" in
+    "dev")
+        dev
+        ;;
+    "publish")
+        publish
+        ;;
+    "")
+        echo "Hello from template CLI tool!"
+        ;;
+    *)
+        echo "Unknown command: $1"
+        echo "Available commands:"
+        echo "  dev     - Clone/update repository for development"
+        echo "  publish - Publish a new version (auto-incrementing)"
+        echo "  (none)  - Show welcome message"
+        ;;
+esac
