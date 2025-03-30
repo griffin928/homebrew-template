@@ -55,17 +55,41 @@ dev() {
 upgrade() {
     echo "Upgrading ${TOOL_NAME} to the latest version..."
     
-    # 先卸载现有版本
-    brew untap "${GITHUB_USER}/${TOOL_NAME}" 2>/dev/null || true
+    # 先卸载包（如果已安装）
+    if brew list "${PACKAGE_NAME}" >/dev/null 2>&1; then
+        echo "Uninstalling current version..."
+        brew uninstall "${PACKAGE_NAME}" || {
+            echo "Error: Failed to uninstall current version"
+            return 1
+        }
+    fi
+    
+    # 卸载 tap（如果存在）
+    if brew tap | grep -q "^${GITHUB_USER}/${TOOL_NAME}\$"; then
+        echo "Removing tap..."
+        brew untap "${GITHUB_USER}/${TOOL_NAME}" || {
+            echo "Error: Failed to remove tap"
+            return 1
+        }
+    fi
     
     # 重新添加 tap
-    brew tap "${GITHUB_USER}/${TOOL_NAME}" "https://github.com/${GITHUB_USER}/${REPO_NAME}.git"
+    echo "Adding tap..."
+    brew tap "${GITHUB_USER}/${TOOL_NAME}" "https://github.com/${GITHUB_USER}/${REPO_NAME}.git" || {
+        echo "Error: Failed to add tap"
+        return 1
+    }
     
     # 安装最新版本
-    brew install "${GITHUB_USER}/${TOOL_NAME}/${PACKAGE_NAME}"
+    echo "Installing latest version..."
+    brew install "${GITHUB_USER}/${TOOL_NAME}/${PACKAGE_NAME}" || {
+        echo "Error: Failed to install latest version"
+        return 1
+    }
     
     # 显示新版本
-    echo "Current version: $(${TOOL_NAME} -v)"
+    NEW_VERSION=$(${TOOL_NAME} -v)
+    echo "Successfully upgraded to version: ${NEW_VERSION}"
 }
 
 # 获取下一个版本号
