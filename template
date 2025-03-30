@@ -11,7 +11,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="${REPO_NAME}.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.9"
+VERSION="v1.0.10"
 
 # 显示帮助信息
 show_help() {
@@ -73,6 +73,17 @@ upgrade() {
         }
     fi
     
+    # 清理所有缓存
+    echo "Cleaning up cache..."
+    brew cleanup "${PACKAGE_NAME}" 2>/dev/null || true
+    
+    # 更新 Homebrew
+    echo "Updating Homebrew..."
+    brew update || {
+        echo "Error: Failed to update Homebrew"
+        return 1
+    }
+    
     # 重新添加 tap
     echo "Adding tap..."
     brew tap "${GITHUB_USER}/${TOOL_NAME}" "https://github.com/${GITHUB_USER}/${REPO_NAME}.git" || {
@@ -80,9 +91,9 @@ upgrade() {
         return 1
     }
     
-    # 安装最新版本
+    # 安装最新版本（强制从源安装）
     echo "Installing latest version..."
-    brew install "${GITHUB_USER}/${TOOL_NAME}/${PACKAGE_NAME}" || {
+    HOMEBREW_NO_BOTTLE=1 brew install --build-from-source "${GITHUB_USER}/${TOOL_NAME}/${PACKAGE_NAME}" || {
         echo "Error: Failed to install latest version"
         return 1
     }
@@ -92,8 +103,8 @@ upgrade() {
     echo "Successfully upgraded to version: ${NEW_VERSION}"
 }
 
-# 获取下一个版本号
-get_next_version() {
+# 获取下一个可用的版本号
+get_next_available_version() {
     # 从 formula 文件中获取当前版本号
     CURRENT_VERSION=$(get_current_version)
     
@@ -102,11 +113,23 @@ get_next_version() {
     MINOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f2)
     PATCH=$(echo "$CURRENT_VERSION" | cut -d'.' -f3)
     
-    # 增加补丁版本号
-    NEW_PATCH=$((PATCH + 1))
-    
-    # 返回新版本号
-    echo "v$MAJOR.$MINOR.$NEW_PATCH"
+    # 增加补丁版本号直到找到未使用的版本号
+    while true; do
+        PATCH=$((PATCH + 1))
+        NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+        
+        # 检查本地标签
+        if ! git tag | grep -q "^$NEW_VERSION\$"; then
+            # 检查远程标签
+            if ! git ls-remote --tags origin "refs/tags/$NEW_VERSION" | grep -q "refs/tags/$NEW_VERSION\$"; then
+                # 找到一个未使用的版本号
+                echo "$NEW_VERSION"
+                return 0
+            fi
+        fi
+        
+        echo "Version $NEW_VERSION already exists, trying next version..."
+    done
 }
 
 # 从 GitHub 下载压缩包并计算 SHA256
@@ -134,15 +157,15 @@ publish() {
         return 1
     fi
 
-    # 获取新版本号
-    NEW_VERSION=$(get_next_version)
+    # 获取下一个可用的版本号
+    NEW_VERSION=$(get_next_available_version)
     echo "Publishing version $NEW_VERSION..."
 
     # 更新 formula 文件中的版本号
     sed -i '' "s/VERSION = \".*\"/VERSION = \"$NEW_VERSION\"/" "$FORMULA_FILE"
 
-    # 更新脚本中的版本号占位符
-    sed -i '' "s/VERSION=\"@@VERSION@@\"/VERSION=\"$NEW_VERSION\"/" "$0"
+    # 更新脚本中的版本号
+    sed -i '' "s/VERSION=\".*\"/VERSION=\"$NEW_VERSION\"/" "$0"
 
     # 提交版本更新
     git add "$FORMULA_FILE" "$0"
