@@ -9,6 +9,17 @@ GITHUB_USER="griffin928"
 GITHUB_REPO="homebrew-template"
 VERSION="v1.0.5"
 
+# 显示帮助信息
+show_help() {
+    echo "Usage: template [command]"
+    echo ""
+    echo "Commands:"
+    echo "  dev         Clone/update repository for development"
+    echo "  publish     Publish a new version (auto-incrementing)"
+    echo "  -v         Show version"
+    echo "  -h         Show this help message"
+}
+
 # 获取当前版本号
 get_current_version() {
     if [ "$VERSION" != "@@VERSION@@" ]; then
@@ -127,15 +138,15 @@ case "$1" in
     "-v"|"--version")
         echo "$(get_current_version)"
         ;;
+    "-h"|"--help")
+        show_help
+        ;;
     "")
-        echo "Hello from template CLI tool!"
+        show_help
         ;;
     *)
         echo "Unknown command: $1"
-        echo "Available commands:"
-        echo "  dev         - Clone/update repository for development"
-        echo "  publish     - Publish a new version (auto-incrementing)"
-        echo "  -v         - Show version"
-        echo "  (none)      - Show welcome message"
+        show_help
+        exit 1
         ;;
 esac
