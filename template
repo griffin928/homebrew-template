@@ -5,6 +5,8 @@ REPO_URL="https://github.com/griffin928/homebrew-template.git"
 WORK_DIR="$HOME/.brewtoolname"
 FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="homebrew-template"
+GITHUB_USER="griffin928"
+GITHUB_REPO="homebrew-template"
 
 # 命令处理函数
 dev() {
@@ -38,6 +40,24 @@ get_next_version() {
     echo "v$MAJOR.$MINOR.$NEW_PATCH"
 }
 
+# 从 GitHub 下载压缩包并计算 SHA256
+get_github_archive_sha256() {
+    VERSION=$1
+    ARCHIVE_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/archive/refs/tags/${VERSION}.tar.gz"
+    TEMP_FILE="/tmp/${PACKAGE_NAME}-${VERSION}.tar.gz"
+    
+    # 下载文件
+    curl -sL "$ARCHIVE_URL" -o "$TEMP_FILE"
+    
+    # 计算 SHA256
+    SHA256=$(shasum -a 256 "$TEMP_FILE" | cut -d' ' -f1)
+    
+    # 删除临时文件
+    rm "$TEMP_FILE"
+    
+    echo "$SHA256"
+}
+
 publish() {
     # 确保在正确的目录
     if [ ! -f "$FORMULA_FILE" ]; then
@@ -52,22 +72,30 @@ publish() {
     # 更新 formula 文件中的版本号
     sed -i '' "s/VERSION = \".*\"/VERSION = \"$VERSION\"/" "$FORMULA_FILE"
 
+    # 提交版本更新
+    git add "$FORMULA_FILE"
+    git commit -m "chore: Bump version to $VERSION"
+    
     # 创建新的 tag
     git tag "$VERSION"
-
-    # 生成新的压缩包和 SHA256
-    tar_name="${PACKAGE_NAME}-${VERSION}.tar.gz"
-    git archive --format=tar.gz --prefix=${PACKAGE_NAME}-${VERSION}/ HEAD > "$tar_name"
-    SHA256=$(shasum -a 256 "$tar_name" | cut -d' ' -f1)
-    rm "$tar_name"
-
+    
+    # 推送更改和标签
+    git push && git push --tags
+    
+    # 等待 GitHub 生成压缩包
+    echo "Waiting for GitHub to generate the archive..."
+    sleep 5
+    
+    # 获取 GitHub 生成的压缩包的 SHA256
+    SHA256=$(get_github_archive_sha256 "$VERSION")
+    
     # 更新 formula 文件中的 SHA256
     sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$FORMULA_FILE"
 
-    # 提交更改
+    # 提交 SHA256 更新
     git add "$FORMULA_FILE"
-    git commit -m "chore: Bump version to $VERSION"
-    git push && git push --tags
+    git commit -m "chore: Update SHA256 for version $VERSION"
+    git push
 
     echo "Version $VERSION published successfully!"
     echo "SHA256: $SHA256"
