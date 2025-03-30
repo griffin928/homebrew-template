@@ -2,7 +2,7 @@ class HomebrewTemplate < Formula
   # GitHub repository information
   GITHUB_USER = "griffin928"
   GITHUB_REPO = "homebrew-template"
-  VERSION = "v1.0.8"
+  VERSION = "v1.0.10"
 
   desc "My personal CLI tool for daily automation"
   homepage "https://github.com/#{GITHUB_USER}/#{GITHUB_REPO}"
