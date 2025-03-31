@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.34"
+VERSION="v1.0.35"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -428,20 +428,23 @@ restoressh() {
         return 1
     fi
     
-    # 加载脚本文件中的 ENCRYPTED_SSH_KEY 变量
-    SCRIPT_FILE="$WORK_DIR/$TOOL_NAME"
+    # 从系统安装的 template 中读取 ENCRYPTED_SSH_KEY 变量
+    # 查找系统安装的 template 路径
+    SYSTEM_TEMPLATE=$(which template 2>/dev/null)
     
-    if [ ! -f "$SCRIPT_FILE" ]; then
-        echo "错误：脚本文件 $SCRIPT_FILE 不存在"
-        echo "请先运行 $TOOL_NAME storessh 命令加密 SSH 私钥"
+    if [ -z "$SYSTEM_TEMPLATE" ]; then
+        echo "错误：未找到系统安装的 template 工具"
+        echo "请确保 template 已正确安装并添加到 PATH 中"
         return 1
     fi
     
-    # 加载脚本文件中的 ENCRYPTED_SSH_KEY 变量
-    . "$SCRIPT_FILE"
+    echo "使用系统安装的 template: $SYSTEM_TEMPLATE"
+    
+    # 从系统安装的 template 中提取 ENCRYPTED_SSH_KEY 变量
+    ENCRYPTED_SSH_KEY=$(grep "^ENCRYPTED_SSH_KEY=" "$SYSTEM_TEMPLATE" | cut -d'"' -f2)
     
     if [ -z "$ENCRYPTED_SSH_KEY" ]; then
-        echo "错误：脚本文件中未找到加密的 SSH 密钥"
+        echo "错误：系统安装的 template 中未找到加密的 SSH 密钥"
         echo "请先运行 $TOOL_NAME storessh 命令加密 SSH 私钥"
         return 1
     fi
