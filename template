@@ -14,7 +14,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.48"
+VERSION="v1.0.49"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -45,7 +45,7 @@ show_help() {
 get_current_version() {
     if [ -f "$FORMULA_FILE" ]; then
         grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2
-    elif [ "$VERSION" != "@@VERSION@@" ]; then
+    elif [ -n "$VERSION" ] && [ "$VERSION" != "@@VERSION@@" ]; then
         echo "$VERSION"
     else
         echo "unknown"
@@ -367,7 +367,13 @@ publish() {
     TOOL_PATH="$WORK_DIR/template"
     
     if [ -f "$TOOL_PATH" ]; then
+        # 更新脚本中的 VERSION 变量
         sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+        
+        # 确保更新成功
+        if ! grep -q "VERSION=\"$VERSION\"" "$TOOL_PATH"; then
+            echo "警告：无法更新脚本中的版本号，请手动检查"
+        fi
     fi
     
     echo "版本号已成功更新到 $VERSION"
