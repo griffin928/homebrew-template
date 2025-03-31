@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.22"
+VERSION="v1.0.23"
 
 # 存储加密后的 SSH 私钥内容
 ENCRYPTED_SSH_KEY="LS0tLS1CRUdJTiBQR1AgTUVTU0FHRS0tLS0tCgpqQTBFQ1FNSUkxTFc3N3dTNlVYKzBzQ1JBUjE4Y0FTQVlpTEMwdVQyUW1TV08rZ1lqTGVjRm1rNnRjQk1ScHlOCmphZG5va1N0dXk0cVoxYXZSMmZVcjZ6T2pzUWlxNEVNSGEyRVZVSG9xWGJJRVowMFRwMjdwUFQ0dUJ4Z1ZqaWMKV1pCYTBSSlcrMmtNL2RSNFlYNWFCRFMvanFEV1NlSWtYd2pVMkRTMXBoQkd4cFhkNmFad0N0UHhCOVJXVHlXQQpPWDRwYzZOUDBjdTkxdktacmI0UlBManMwRlQyODVKUW5QOVBsem9NbVhnaEZmZERoKzNvbmFkR3VrVERJZDBJClovUVJNekVacDg3VVNOOEhlNkpMQkJ5SmRjWjN2K2k0M1dxc0Q4RjJJNGloejRnQVpPcnF6RmlUY05YK2o3WEwKR2NyQTJLdjB6Zk9Gd1BhV0RIREYxTXZtdEx2cUtkeUFoMkRuVXZWYmtHb1J6U251T0xTeUF5SzJQL0NKdnRraAp2TXJJaEtaS2kvdE41Q0QzU1pTVFM0VWhzNmtVSDM3enNiclJRYXVDUHVVRW80RmhuQllTSmhrQXl5bHNiRTB3CkVtdFIrNmRDclM0YzJzeUxYajFrSG9Rd1BnPT0KPW5WRncKLS0tLS1FTkQgUEdQIE1FU1NBR0UtLS0tLQo="
@@ -172,7 +172,7 @@ get_next_available_version() {
     # 增加补丁版本号直到找到未使用的版本号
     while true; do
         PATCH=$((PATCH + 1))
-        NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+        NEW_VERSION="v1.0.23"
         
         # 检查本地标签
         if ! git tag | grep -q "^$NEW_VERSION\$"; then
@@ -299,7 +299,7 @@ publish() {
     echo "更新脚本版本号..."
     TOOL_PATH="$PROJECT_DIR/template"
     if [ -f "$TOOL_PATH" ]; then
-        # 使用更通用的正则表达式匹配 VERSION="v1.0.21"
+        # 使用更通用的正则表达式匹配 VERSION="v1.0.23"
         sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
     fi
     
