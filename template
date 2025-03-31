@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.17"
+VERSION="v1.0.18"
 
 # 存储加密后的 SSH 私钥内容
 ENCRYPTED_SSH_KEY=""
@@ -207,20 +207,57 @@ get_github_archive_sha256() {
 }
 
 publish() {
-    # 确保当前目录是项目根目录
+    # 首先检查是否在项目根目录
     if [ -f "homebrew-template.rb" ]; then
         # 当前目录是项目根目录
         FORMULA_PATH="$(pwd)/homebrew-template.rb"
+        PROJECT_DIR="$(pwd)"
     elif [ -f "$WORK_DIR/homebrew-template.rb" ]; then
         # 工作目录中有公式文件
         FORMULA_PATH="$WORK_DIR/homebrew-template.rb"
+        PROJECT_DIR="$WORK_DIR"
+        echo "在工作目录 $WORK_DIR 中发布..."
         cd "$WORK_DIR" || {
             echo "无法切换到工作目录 $WORK_DIR"
             return 1
         }
     else
-        echo "错误：homebrew-template.rb 未找到。请确保在项目根目录运行此命令。"
-        return 1
+        # 检查工作目录是否存在
+        if [ ! -d "$WORK_DIR" ]; then
+            echo "错误：工作目录 $WORK_DIR 不存在"
+            echo "请先运行 $TOOL_NAME dev 命令创建工作目录"
+            return 1
+        fi
+        
+        # 工作目录存在但没有公式文件，尝试克隆仓库
+        echo "工作目录存在但没有公式文件，尝试克隆仓库..."
+        cd "$WORK_DIR" || {
+            echo "无法切换到工作目录 $WORK_DIR"
+            return 1
+        }
+        
+        # 检查是否已经是 Git 仓库
+        if [ -d ".git" ]; then
+            echo "工作目录已经是 Git 仓库，尝试拉取最新更改..."
+            git pull
+        else
+            echo "克隆仓库到工作目录..."
+            # 使用自定义 SSH 仓库 URL（如果有）
+            if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
+                git clone "$CUSTOM_SSH_REPO_URL" .
+            else
+                git clone "$REPO_URL" .
+            fi
+        fi
+        
+        # 再次检查公式文件是否存在
+        if [ -f "homebrew-template.rb" ]; then
+            FORMULA_PATH="$(pwd)/homebrew-template.rb"
+            PROJECT_DIR="$(pwd)"
+        else
+            echo "错误：克隆仓库后仍然找不到 homebrew-template.rb 文件"
+            return 1
+        fi
     fi
     
     # 拉取最新更改
@@ -236,7 +273,7 @@ publish() {
     
     # 更新脚本中的版本号
     echo "更新脚本版本号..."
-    TOOL_PATH="$(pwd)/template"
+    TOOL_PATH="$PROJECT_DIR/template"
     if [ -f "$TOOL_PATH" ]; then
         sed -i '' "s/VERSION=\"$CURRENT_VERSION\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
     fi
@@ -572,14 +609,12 @@ case "$1" in
     "publish")
         publish
         ;;
+    "pulish") # 添加拼写错误的别名
+        echo "提示：命令 'pulish' 可能是拼写错误，执行 'publish' 命令..."
+        publish
+        ;;
     "upgrade")
         upgrade
-        ;;
-    "-v")
-        echo "$(get_current_version)"
-        ;;
-    "-h" | "--help" | "help")
-        show_help
         ;;
     "storessh")
         storessh
@@ -587,7 +622,15 @@ case "$1" in
     "restoressh")
         restoressh
         ;;
-    *)
+    "-v")
+        echo "$VERSION"
+        ;;
+    "-h"|"--help"|"")
         show_help
+        ;;
+    *)
+        echo "未知命令: $1"
+        show_help
+        exit 1
         ;;
 esac
