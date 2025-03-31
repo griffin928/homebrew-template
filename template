@@ -184,7 +184,8 @@ get_next_available_version() {
             fi
         fi
         
-        echo "Version $NEW_VERSION already exists, trying next version..."
+        # 版本已存在，输出到标准错误而不是标准输出
+        echo "版本 $NEW_VERSION 已存在，尝试下一个版本..." >&2
     done
 }
 
