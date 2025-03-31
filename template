@@ -275,16 +275,54 @@ publish() {
     echo "创建标签 $VERSION..."
     git tag "$VERSION"
     
-    # 计算新版本的 SHA256
-    echo "计算新版本的 SHA256 值..."
-    DOWNLOAD_URL="https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz"
-    NEW_SHA256=$(curl -sL "$DOWNLOAD_URL" | shasum -a 256 | cut -d ' ' -f1)
+    # 使用轮询方式等待 GitHub 生成压缩包并计算 SHA256
+    MAX_ATTEMPTS=10
+    ATTEMPT=1
+    LAST_SHA256=""
     
-    if [ -z "$NEW_SHA256" ]; then
-        echo "错误：无法计算 SHA256 值，请检查网络连接或标签是否已推送"
-        # 删除刚才创建的标签
-        git tag -d "$VERSION"
-        return 1
+    echo "等待 GitHub 生成压缩包并验证其完整性..."
+    while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+        echo "尝试 $ATTEMPT/$MAX_ATTEMPTS..."
+        
+        # 下载并计算 SHA256
+        DOWNLOAD_URL="https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz"
+        CURRENT_SHA256=$(curl -sL "$DOWNLOAD_URL" | shasum -a 256 | cut -d ' ' -f1)
+        
+        # 检查是否获取到有效的 SHA256
+        if [ -z "$CURRENT_SHA256" ] || [ "$CURRENT_SHA256" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]; then
+            # 空文件或无效响应的 SHA256，等待并重试
+            echo "  GitHub 尚未生成压缩包，等待 3 秒后重试..."
+            sleep 3
+            ATTEMPT=$((ATTEMPT + 1))
+            continue
+        fi
+        
+        # 如果这是第一次获取有效的 SHA256，或者与上次不同
+        if [ -z "$LAST_SHA256" ]; then
+            echo "  首次获取 SHA256: $CURRENT_SHA256"
+            LAST_SHA256="$CURRENT_SHA256"
+            # 等待并再次检查以确保稳定
+            sleep 2
+            continue
+        elif [ "$CURRENT_SHA256" != "$LAST_SHA256" ]; then
+            echo "  SHA256 值不稳定，上次: $LAST_SHA256，当前: $CURRENT_SHA256"
+            echo "  等待 2 秒后重试..."
+            LAST_SHA256="$CURRENT_SHA256"
+            sleep 2
+            continue
+        else
+            # SHA256 值连续两次相同，认为是稳定的
+            echo "  SHA256 值已稳定: $CURRENT_SHA256"
+            NEW_SHA256="$CURRENT_SHA256"
+            break
+        fi
+    done
+    
+    if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
+        echo "错误：无法获取稳定的 SHA256 值，请稍后手动更新"
+        echo "最后获取的 SHA256 值: $LAST_SHA256"
+        # 继续执行，但稍后可能需要手动更新 SHA256
+        NEW_SHA256="$LAST_SHA256"
     fi
     
     echo "新的 SHA256: $NEW_SHA256"
