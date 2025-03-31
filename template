@@ -14,7 +14,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.49"
+VERSION="v1.0.50"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -314,6 +314,25 @@ publish() {
     FORMULA_PATH="$FORMULA_FILE"
     echo "更新公式文件: $FORMULA_PATH"
     
+    # 首先更新脚本中的版本号
+    echo "更新脚本版本号..."
+    TOOL_PATH="$WORK_DIR/template"
+    
+    if [ -f "$TOOL_PATH" ]; then
+        # 更新脚本中的 VERSION 变量
+        sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+        
+        # 确保更新成功
+        if ! grep -q "VERSION=\"$VERSION\"" "$TOOL_PATH"; then
+            echo "警告：无法更新脚本中的版本号，请手动检查"
+        fi
+    fi
+    
+    # 提交版本号更新
+    git add "$TOOL_PATH"
+    git commit -m "更新脚本版本号到 $VERSION"
+    git push
+    
     # 创建并推送标签
     echo "创建标签 $VERSION..."
     git tag "$VERSION"
@@ -362,25 +381,11 @@ publish() {
     OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d'"' -f2)
     sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
     
-    # 更新脚本中的版本号
-    echo "更新脚本版本号..."
-    TOOL_PATH="$WORK_DIR/template"
-    
-    if [ -f "$TOOL_PATH" ]; then
-        # 更新脚本中的 VERSION 变量
-        sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
-        
-        # 确保更新成功
-        if ! grep -q "VERSION=\"$VERSION\"" "$TOOL_PATH"; then
-            echo "警告：无法更新脚本中的版本号，请手动检查"
-        fi
-    fi
-    
     echo "版本号已成功更新到 $VERSION"
     
     # 提交所有更改并推送
     echo "提交所有更改..."
-    git add "$FORMULA_PATH" "$TOOL_PATH"
+    git add "$FORMULA_PATH"
     git commit -m "发布版本 $VERSION 并更新 SHA256"
     git push
     
