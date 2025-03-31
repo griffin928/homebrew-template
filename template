@@ -172,7 +172,7 @@ get_next_available_version() {
     # 增加补丁版本号直到找到未使用的版本号
     while true; do
         PATCH=$((PATCH + 1))
-        NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+        NEW_VERSION="v1.0.26"
         
         # 检查本地标签
         if ! git tag | grep -q "^$NEW_VERSION\$"; then
