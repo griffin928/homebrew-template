@@ -12,10 +12,10 @@ REPO_NAME="homebrew-${TOOL_NAME}"
 REPO_URL="git@github.com:${GITHUB_USER}/${REPO_NAME}.git"
 CUSTOM_SSH_REPO_URL=""  # 特定 SSH 配置的仓库 URL，默认为空
 WORK_DIR="$HOME/.${TOOL_NAME}"
-FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
+FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.37"
+VERSION="v1.0.38"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -229,7 +229,7 @@ publish() {
     echo "新版本: $VERSION"
     
     # 更新公式文件中的版本号
-    FORMULA_PATH="$WORK_DIR/homebrew-template.rb"
+    FORMULA_PATH="$FORMULA_FILE"
     echo "更新公式文件: $FORMULA_PATH"
     
     # 创建并推送标签
