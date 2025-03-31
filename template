@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.17"
+VERSION="v1.0.21"
 
 # 存储加密后的 SSH 私钥内容
 ENCRYPTED_SSH_KEY=""
@@ -172,7 +172,7 @@ get_next_available_version() {
     # 增加补丁版本号直到找到未使用的版本号
     while true; do
         PATCH=$((PATCH + 1))
-        NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
+        NEW_VERSION="v1.0.21"
         
         # 检查本地标签
         if ! git tag | grep -q "^$NEW_VERSION\$"; then
@@ -299,7 +299,8 @@ publish() {
     echo "更新脚本版本号..."
     TOOL_PATH="$PROJECT_DIR/template"
     if [ -f "$TOOL_PATH" ]; then
-        sed -i '' "s/VERSION=\"$CURRENT_VERSION\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+        # 使用更通用的正则表达式匹配 VERSION="v1.0.21"
+        sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
     fi
     
     # 提交所有更改并推送
