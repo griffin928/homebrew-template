@@ -4,14 +4,21 @@
 GITHUB_USER="griffin928"
 TOOL_NAME="template"
 
+# JetBrains 应用列表
+JETBRAINS_APPS=("PyCharm" "GoLand" "IntelliJ IDEA" "IntelliJ IDEA CE" "WebStorm" "CLion" "PhpStorm" "RubyMine" "DataGrip")
+
 # 配置
 REPO_NAME="homebrew-${TOOL_NAME}"
-REPO_URL="https://github.com/${GITHUB_USER}/${REPO_NAME}.git"
+REPO_URL="git@github.com:${GITHUB_USER}/${REPO_NAME}.git"
+CUSTOM_SSH_REPO_URL=""  # 特定 SSH 配置的仓库 URL，默认为空
 WORK_DIR="$HOME/.${TOOL_NAME}"
-FORMULA_FILE="${REPO_NAME}.rb"
+FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.11"
+VERSION="v1.0.15"
+
+# 存储加密后的 SSH 私钥内容
+ENCRYPTED_SSH_KEY=""
 
 # 显示帮助信息
 show_help() {
@@ -23,6 +30,8 @@ show_help() {
     echo "  upgrade    Force upgrade to the latest version"
     echo "  -v         Show version"
     echo "  -h         Show this help message"
+    echo "  storessh   加密并存储 SSH 私钥"
+    echo "  restoressh  解密并使用 SSH 私钥"
 }
 
 # 获取当前版本号
@@ -39,16 +48,63 @@ get_current_version() {
 # 命令处理函数
 dev() {
     if [ ! -d "$WORK_DIR" ]; then
-        echo "Creating development directory: $WORK_DIR"
+        echo "创建开发目录: $WORK_DIR"
         mkdir -p "$WORK_DIR"
-        git clone "$REPO_URL" "$WORK_DIR"
-        echo "Repository cloned to $WORK_DIR"
+        
+        # 使用自定义 SSH 仓库 URL（如果有）
+        if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
+            git clone "$CUSTOM_SSH_REPO_URL" "$WORK_DIR"
+        else
+            git clone "$REPO_URL" "$WORK_DIR"
+        fi
+        
+        echo "仓库已克隆到 $WORK_DIR"
     else
-        echo "Development directory already exists: $WORK_DIR"
-        cd "$WORK_DIR" && git pull
-        echo "Repository updated"
+        echo "开发目录已存在: $WORK_DIR"
+        cd "$WORK_DIR" || return 1
+        
+        # 确保远程 URL 是正确的
+        if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
+            git remote set-url origin "$CUSTOM_SSH_REPO_URL"
+        else
+            git remote set-url origin "$REPO_URL"
+        fi
+        
+        # 拉取最新更改
+        echo "拉取最新更改..."
+        git pull
     fi
-    echo "You can now develop the ${TOOL_NAME} in: $WORK_DIR"
+    
+    # 检查公式文件是否存在
+    if [ ! -f "$WORK_DIR/$FORMULA_FILE" ]; then
+        echo "错误：$FORMULA_FILE 未找到。请确保仓库结构正确。"
+        return 1
+    fi
+    
+    echo "开发环境已准备就绪"
+    echo "工作目录: $WORK_DIR"
+    echo "当前版本: $(get_current_version)"
+    
+    # 打开编辑器（如果有）
+    if [ -n "$EDITOR" ]; then
+        echo "正在打开编辑器: $EDITOR $WORK_DIR"
+        $EDITOR "$WORK_DIR"
+    elif command -v code >/dev/null 2>&1; then
+        echo "正在打开 Visual Studio Code..."
+        code "$WORK_DIR"
+    else
+        # 检查是否有 JetBrains IDE
+        for app in "${JETBRAINS_APPS[@]}"; do
+            app_path="/Applications/$app.app"
+            if [ -d "$app_path" ]; then
+                echo "正在打开 $app..."
+                open -a "$app" "$WORK_DIR"
+                break
+            fi
+        done
+    fi
+    
+    return 0
 }
 
 # 强制升级到最新版本
@@ -116,7 +172,7 @@ get_next_available_version() {
     # 增加补丁版本号直到找到未使用的版本号
     while true; do
         PATCH=$((PATCH + 1))
-        NEW_VERSION="v1.0.11"
+        NEW_VERSION="v$MAJOR.$MINOR.$PATCH"
         
         # 检查本地标签
         if ! git tag | grep -q "^$NEW_VERSION\$"; then
@@ -151,49 +207,325 @@ get_github_archive_sha256() {
 }
 
 publish() {
-    # 确保在正确的目录
-    if [ ! -f "$FORMULA_FILE" ]; then
-        echo "Error: $FORMULA_FILE not found. Please run this command in the repository root."
+    # 确保当前目录是项目根目录
+    if [ -f "homebrew-template.rb" ]; then
+        # 当前目录是项目根目录
+        FORMULA_PATH="$(pwd)/homebrew-template.rb"
+    elif [ -f "$WORK_DIR/homebrew-template.rb" ]; then
+        # 工作目录中有公式文件
+        FORMULA_PATH="$WORK_DIR/homebrew-template.rb"
+        cd "$WORK_DIR" || {
+            echo "无法切换到工作目录 $WORK_DIR"
+            return 1
+        }
+    else
+        echo "错误：homebrew-template.rb 未找到。请确保在项目根目录运行此命令。"
         return 1
     fi
-
-    # 获取下一个可用的版本号
-    NEW_VERSION=$(get_next_available_version)
-    echo "Publishing version $NEW_VERSION..."
-
-    # 更新 formula 文件中的版本号
-    sed -i '' "s/VERSION = \".*\"/VERSION = \"$NEW_VERSION\"/" "$FORMULA_FILE"
-
+    
+    # 拉取最新更改
+    echo "拉取最新更改..."
+    git pull
+    
+    # 获取当前版本和下一个版本
+    CURRENT_VERSION=$(get_current_version)
+    VERSION=$(get_next_available_version)
+    
+    echo "当前版本: $CURRENT_VERSION"
+    echo "新版本: $VERSION"
+    
+    # 更新公式文件中的版本号
+    echo "更新公式文件..."
+    sed -i '' "s/VERSION = \"$CURRENT_VERSION\"/VERSION = \"$VERSION\"/" "$FORMULA_PATH"
+    
     # 更新脚本中的版本号
-    sed -i '' "s/VERSION=\".*\"/VERSION=\"$NEW_VERSION\"/" "$0"
-
-    # 提交版本更新
-    git add "$FORMULA_FILE" "$0"
-    git commit -m "chore: Bump version to $NEW_VERSION"
+    echo "更新脚本版本号..."
+    TOOL_PATH="$(pwd)/template"
+    if [ -f "$TOOL_PATH" ]; then
+        sed -i '' "s/VERSION=\"$CURRENT_VERSION\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+    fi
     
-    # 创建新的 tag
-    git tag "$NEW_VERSION"
+    # 提交更改
+    echo "提交更改..."
+    git add "$FORMULA_PATH" "$TOOL_PATH"
+    git commit -m "Bump version to $VERSION"
     
-    # 推送更改和标签
-    git push && git push --tags
-    
-    # 等待 GitHub 生成压缩包
-    echo "Waiting for GitHub to generate the archive..."
-    sleep 5
-    
-    # 获取 GitHub 生成的压缩包的 SHA256
-    SHA256=$(get_github_archive_sha256 "$NEW_VERSION")
-    
-    # 更新 formula 文件中的 SHA256
-    sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$FORMULA_FILE"
-
-    # 提交 SHA256 更新
-    git add "$FORMULA_FILE"
-    git commit -m "chore: Update SHA256 for version $NEW_VERSION"
+    # 推送更改
+    echo "推送更改..."
     git push
+    
+    echo "版本 $VERSION 已发布"
+    return 0
+}
 
-    echo "Version $NEW_VERSION published successfully!"
-    echo "SHA256: $SHA256"
+# 选择并加密 SSH 私钥
+storessh() {
+    echo "选择并加密 SSH 私钥..."
+    
+    # 检查工作目录是否存在
+    if [ ! -d "$WORK_DIR" ]; then
+        echo "错误：工作目录 $WORK_DIR 不存在"
+        echo "请先运行 $TOOL_NAME dev 命令创建工作目录"
+        return 1
+    fi
+    
+    # 检查 gpg 是否安装
+    if ! command -v gpg >/dev/null 2>&1; then
+        echo "错误：未安装 gpg 命令，请先安装 GnuPG"
+        echo "可以使用以下命令安装："
+        echo "  brew install gnupg"
+        return 1
+    fi
+    
+    # 查找所有私钥文件
+    SSH_DIR="$HOME/.ssh"
+    
+    # 检查 SSH 目录是否存在
+    if [ ! -d "$SSH_DIR" ]; then
+        echo "错误：SSH 目录不存在，请先创建 SSH 密钥"
+        echo "运行以下命令生成新密钥："
+        echo "  ssh-keygen -t ed25519 -C \"your_email@example.com\""
+        return 1
+    fi
+    
+    # 列出所有私钥文件
+    echo "可用的 SSH 私钥文件："
+    KEY_FILES=()
+    KEY_INDEX=1
+    
+    for key_file in "$SSH_DIR"/id_*; do
+        # 跳过公钥和非文件
+        if [[ "$key_file" == *.pub ]] || [ ! -f "$key_file" ]; then
+            continue
+        fi
+        
+        KEY_FILES+=("$key_file")
+        echo "$KEY_INDEX) $(basename "$key_file")"
+        KEY_INDEX=$((KEY_INDEX + 1))
+    done
+    
+    if [ ${#KEY_FILES[@]} -eq 0 ]; then
+        echo "未找到 SSH 私钥文件"
+        return 1
+    fi
+    
+    # 让用户选择私钥文件
+    echo "请选择要加密的 SSH 私钥文件 (1-${#KEY_FILES[@]})："
+    read -r SELECTED_INDEX
+    
+    # 验证输入
+    if ! [[ "$SELECTED_INDEX" =~ ^[0-9]+$ ]] || [ "$SELECTED_INDEX" -lt 1 ] || [ "$SELECTED_INDEX" -gt ${#KEY_FILES[@]} ]; then
+        echo "无效的选择"
+        return 1
+    fi
+    
+    SELECTED_KEY_FILE="${KEY_FILES[$((SELECTED_INDEX - 1))]}"
+    echo "已选择: $SELECTED_KEY_FILE"
+    
+    # 让用户输入加密密码
+    echo "请输入用于加密的密码："
+    read -r -s ENCRYPTION_PASSWORD
+    echo ""
+    echo "请再次输入密码进行确认："
+    read -r -s CONFIRM_PASSWORD
+    echo ""
+    
+    if [ "$ENCRYPTION_PASSWORD" != "$CONFIRM_PASSWORD" ]; then
+        echo "错误：两次输入的密码不匹配"
+        return 1
+    fi
+    
+    # 使用 gpg 加密私钥
+    echo "正在加密 SSH 私钥..."
+    ENCRYPTED_KEY=$(gpg --symmetric --batch --passphrase "$ENCRYPTION_PASSWORD" --armor < "$SELECTED_KEY_FILE" 2>/dev/null)
+    
+    if [ $? -ne 0 ]; then
+        echo "加密失败"
+        return 1
+    fi
+    
+    # 存储加密后的私钥到全局变量
+    ENCRYPTED_SSH_KEY="$ENCRYPTED_KEY"
+    
+    # 创建或更新配置文件
+    CONFIG_FILE="$WORK_DIR/$TOOL_NAME"
+    
+    # 如果文件已存在，先备份
+    if [ -f "$CONFIG_FILE" ]; then
+        cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
+    fi
+    
+    # 写入配置文件
+    if [ -f "$CONFIG_FILE" ]; then
+        # 如果文件存在，更新 ENCRYPTED_SSH_KEY 变量
+        # 使用临时文件避免管道问题
+        TMP_FILE=$(mktemp)
+        cat "$CONFIG_FILE" | sed '/^ENCRYPTED_SSH_KEY=/d' > "$TMP_FILE"
+        echo "ENCRYPTED_SSH_KEY='$ENCRYPTED_KEY'" >> "$TMP_FILE"
+        mv "$TMP_FILE" "$CONFIG_FILE"
+    else
+        # 如果文件不存在，创建新文件
+        echo "#!/bin/sh" > "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# 配置文件 - 由 $TOOL_NAME 工具自动生成" >> "$CONFIG_FILE"
+        echo "# 请勿手动编辑" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "ENCRYPTED_SSH_KEY='$ENCRYPTED_KEY'" >> "$CONFIG_FILE"
+    fi
+    
+    # 设置正确的权限
+    chmod 600 "$CONFIG_FILE"
+    
+    echo "SSH 私钥已成功加密并保存到 $CONFIG_FILE"
+    
+    return 0
+}
+
+# 解密 SSH 私钥并使用
+restoressh() {
+    # 检查工作目录是否存在
+    if [ ! -d "$WORK_DIR" ]; then
+        echo "错误：工作目录 $WORK_DIR 不存在"
+        echo "请先运行 $TOOL_NAME dev 命令创建工作目录"
+        return 1
+    fi
+    
+    # 从配置文件加载加密的 SSH 密钥
+    CONFIG_FILE="$WORK_DIR/$TOOL_NAME"
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "错误：未找到配置文件 $CONFIG_FILE"
+        echo "请先运行 $TOOL_NAME storessh 命令加密 SSH 密钥"
+        return 1
+    fi
+    
+    # 加载配置文件
+    . "$CONFIG_FILE"
+    
+    if [ -z "$ENCRYPTED_SSH_KEY" ]; then
+        echo "错误：配置文件中未找到加密的 SSH 密钥"
+        echo "请先运行 $TOOL_NAME storessh 命令加密 SSH 密钥"
+        return 1
+    fi
+    
+    # 让用户输入解密密码
+    echo "请输入解密密码："
+    read -r -s DECRYPTION_PASSWORD
+    echo ""
+    
+    # 创建临时文件
+    TEMP_ENCRYPTED_KEY=$(mktemp)
+    
+    # 写入加密的密钥到临时文件
+    echo "$ENCRYPTED_SSH_KEY" > "$TEMP_ENCRYPTED_KEY"
+    
+    # 创建 SSH 目录（如果不存在）
+    SSH_DIR="$HOME/.ssh"
+    mkdir -p "$SSH_DIR"
+    
+    # 设置 SSH 私钥文件路径
+    SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
+    
+    # 解密私钥并写入文件
+    echo "正在解密 SSH 私钥..."
+    gpg --batch --passphrase "$DECRYPTION_PASSWORD" --decrypt "$TEMP_ENCRYPTED_KEY" > "$SSH_KEY_FILE" 2>/dev/null
+    
+    if [ $? -ne 0 ]; then
+        echo "解密失败，密码可能不正确"
+        rm -f "$TEMP_ENCRYPTED_KEY"
+        return 1
+    fi
+    
+    # 清理临时文件
+    rm -f "$TEMP_ENCRYPTED_KEY"
+    
+    # 设置正确的权限
+    chmod 600 "$SSH_KEY_FILE"
+    
+    echo "SSH 私钥已解密并保存到 $SSH_KEY_FILE"
+    
+    # 将私钥添加到 SSH agent
+    echo "正在将私钥添加到 SSH agent..."
+    ssh-add "$SSH_KEY_FILE" 2>/dev/null
+    
+    if [ $? -ne 0 ]; then
+        # 如果 SSH agent 未运行，尝试启动它
+        eval "$(ssh-agent)" > /dev/null
+        ssh-add "$SSH_KEY_FILE"
+        
+        if [ $? -ne 0 ]; then
+            echo "无法将私钥添加到 SSH agent"
+            return 1
+        fi
+    fi
+    
+    echo "私钥已成功添加到 SSH agent"
+    
+    # 更新 SSH 配置
+    CONFIG_FILE="$SSH_DIR/config"
+    
+    # 检查是否已存在配置
+    if grep -q "Host github-${TOOL_NAME}" "$CONFIG_FILE" 2>/dev/null; then
+        # 更新现有配置
+        TMP_FILE=$(mktemp)
+        awk -v tool="$TOOL_NAME" -v key="$SSH_KEY_FILE" '
+        /Host github-'$tool'/ {
+            print $0;
+            getline;
+            while ($0 !~ /^Host / && NF > 0) {
+                if ($1 == "IdentityFile") {
+                    print "  IdentityFile " key;
+                } else {
+                    print $0;
+                }
+                if (getline <= 0) break;
+            }
+            if (NF > 0) print $0;
+            next;
+        }
+        {print}
+        ' "$CONFIG_FILE" > "$TMP_FILE"
+        mv "$TMP_FILE" "$CONFIG_FILE"
+    else
+        # 添加新配置
+        echo "" >> "$CONFIG_FILE"
+        echo "# 由 $TOOL_NAME 工具自动添加的配置" >> "$CONFIG_FILE"
+        echo "Host github-${TOOL_NAME}" >> "$CONFIG_FILE"
+        echo "  HostName github.com" >> "$CONFIG_FILE"
+        echo "  User git" >> "$CONFIG_FILE"
+        echo "  IdentityFile $SSH_KEY_FILE" >> "$CONFIG_FILE"
+        echo "  IdentitiesOnly yes" >> "$CONFIG_FILE"
+    fi
+    
+    # 设置正确的权限
+    chmod 600 "$CONFIG_FILE"
+    
+    # 更新仓库 URL 使用特定主机
+    CUSTOM_SSH_REPO_URL=$(echo "$REPO_URL" | sed "s/git@github.com/git@github-${TOOL_NAME}/")
+    
+    echo "SSH 配置已更新，使用 $SSH_KEY_FILE 连接到 GitHub"
+    echo "自定义仓库 URL: $CUSTOM_SSH_REPO_URL"
+    
+    # 如果在工作目录中，更新远程 URL
+    if [ -d "$WORK_DIR/.git" ]; then
+        cd "$WORK_DIR" || return 1
+        git remote set-url origin "$CUSTOM_SSH_REPO_URL"
+        echo "已更新仓库 URL 使用特定 SSH 配置: $CUSTOM_SSH_REPO_URL"
+    fi
+    
+    # 测试 SSH 连接
+    echo "测试 SSH 连接..."
+    SSH_TEST=$(ssh -T -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new "git@github-${TOOL_NAME}" 2>&1)
+    
+    if echo "$SSH_TEST" | grep -q "successfully authenticated"; then
+        USERNAME=$(echo "$SSH_TEST" | grep -o "Hi [^!]*" | cut -d' ' -f2)
+        echo "  SSH 认证成功，用户名: $USERNAME"
+        return 0
+    else
+        echo "  SSH 认证失败，请检查 SSH 密钥和配置"
+        echo "  错误信息: $SSH_TEST"
+        return 1
+    fi
 }
 
 # 主命令处理
@@ -207,18 +539,19 @@ case "$1" in
     "upgrade")
         upgrade
         ;;
-    "-v"|"--version")
+    "-v")
         echo "$(get_current_version)"
         ;;
-    "-h"|"--help")
+    "-h" | "--help" | "help")
         show_help
         ;;
-    "")
-        show_help
+    "storessh")
+        storessh
+        ;;
+    "restoressh")
+        restoressh
         ;;
     *)
-        echo "Unknown command: $1"
         show_help
-        exit 1
         ;;
 esac
