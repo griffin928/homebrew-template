@@ -499,36 +499,45 @@ restoressh() {
     CONFIG_FILE="$SSH_DIR/config"
     
     # 检查是否已存在配置
-    if grep -q "Host github.com-${TOOL_NAME}" "$CONFIG_FILE" 2>/dev/null; then
-        # 更新现有配置
+    if grep -q "^Host github.com-${TOOL_NAME}$" "$CONFIG_FILE" 2>/dev/null; then
+        # 删除现有配置并添加新配置
         TMP_FILE=$(mktemp)
         awk -v tool="$TOOL_NAME" -v key="$SSH_KEY_FILE" '
-        /Host github.com-'$tool'/ {
-            print $0;
-            getline;
-            identities_seen = 0;  # 用于跟踪是否已经看到 IdentitiesOnly
-            while ($0 !~ /^Host / && NF > 0) {
-                if ($1 == "IdentityFile") {
-                    print "    IdentityFile " key;
-                } else if ($1 == "IdentitiesOnly") {
-                    if (identities_seen == 0) {
-                        print "    IdentitiesOnly yes";
-                        identities_seen = 1;
-                    }
-                    # 如果已经看到过 IdentitiesOnly，就跳过这一行
-                } else {
-                    print $0;
-                }
-                if (getline <= 0) break;
-            }
-            # 如果没有看到 IdentitiesOnly，添加一行
-            if (identities_seen == 0) {
+        BEGIN { skip = 0; host_found = 0; }
+        
+        # 如果找到目标 Host，设置 skip 标志并记录已找到
+        $0 ~ "^Host[[:space:]]+github.com-"tool"$" { 
+            if (!host_found) {
+                # 第一次找到目标 Host，输出新配置
+                print "";
+                print "Host github.com-"tool;
+                print "    HostName github.com";
+                print "    User git";
+                print "    IdentityFile "key;
                 print "    IdentitiesOnly yes";
+                host_found = 1;
             }
-            if (NF > 0) print $0;
+            skip = 1; 
             next;
         }
-        {print}
+        
+        # 如果遇到新的 Host，停止跳过
+        /^Host / { skip = 0; }
+        
+        # 如果不在跳过模式，输出行
+        !skip { print $0; }
+        
+        # 在文件末尾，如果没有找到 Host，添加新配置
+        END {
+            if (!host_found) {
+                print "";
+                print "Host github.com-"tool;
+                print "    HostName github.com";
+                print "    User git";
+                print "    IdentityFile "key;
+                print "    IdentitiesOnly yes";
+            }
+        }
         ' "$CONFIG_FILE" > "$TMP_FILE"
         mv "$TMP_FILE" "$CONFIG_FILE"
     else
