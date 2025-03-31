@@ -15,7 +15,7 @@ FORMULA_FILE="${TOOL_NAME}.rb"
 FORMULA_PATH="$WORK_DIR/$FORMULA_FILE"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.52"
+VERSION="v1.0.53"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -174,9 +174,9 @@ dev() {
     echo "  $0 restoressh       # 如果需要，更新 SSH 密钥"
     
     # 尝试使用 Windsurf 打开工作目录
-    if command -v windsurf >/dev/null 2>&1; then
+    if [ -d "/Applications/Windsurf.app" ]; then
         echo "尝试使用 Windsurf 打开工作目录..."
-        windsurf "$WORK_DIR" >/dev/null 2>&1 &
+        open -a Windsurf "$WORK_DIR"
         return 0
     fi
     
