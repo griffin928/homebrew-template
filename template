@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.33"
+VERSION="v1.0.34"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -406,28 +406,10 @@ storessh() {
     # 更新脚本文件中的 ENCRYPTED_SSH_KEY 变量
     SCRIPT_FILE="$WORK_DIR/$TOOL_NAME"
     
-    # 如果文件已存在，先备份
-    if [ -f "$SCRIPT_FILE" ]; then
-        cp "$SCRIPT_FILE" "$SCRIPT_FILE.bak"
-    fi
-    
     echo "更新脚本文件中的 ENCRYPTED_SSH_KEY 变量..."
     
-    # 创建临时文件
-    TMP_FILE=$(mktemp)
-    
     # 使用 sed 替换 ENCRYPTED_SSH_KEY 变量的值
-    sed "s/^ENCRYPTED_SSH_KEY=.*$/ENCRYPTED_SSH_KEY=\"$ENCODED_KEY\"/" "$SCRIPT_FILE" > "$TMP_FILE"
-    
-    # 检查临时文件是否创建成功
-    if [ ! -s "$TMP_FILE" ]; then
-        echo "错误：临时文件创建失败"
-        rm -f "$TMP_FILE"
-        return 1
-    fi
-    
-    # 替换原始文件
-    mv "$TMP_FILE" "$SCRIPT_FILE"
+    sed -i '' "s/^ENCRYPTED_SSH_KEY=.*$/ENCRYPTED_SSH_KEY=\"$ENCODED_KEY\"/" "$SCRIPT_FILE"
     
     # 设置正确的权限（保持执行权限）
     chmod 755 "$SCRIPT_FILE"
