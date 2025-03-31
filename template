@@ -14,7 +14,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.46"
+VERSION="v1.0.47"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -55,12 +55,59 @@ get_current_version() {
 # 命令处理函数
 dev() {
     # 检查是否已安装必要的工具
+    missing_tools=()
     for tool in git gpg curl; do
         if ! command -v $tool >/dev/null 2>&1; then
-            echo "错误：缺少必要的工具 $tool，请先安装"
-            return 1
+            missing_tools+=("$tool")
         fi
     done
+    
+    # 如果有缺少的工具，提示安装
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        echo "错误：缺少必要的工具：${missing_tools[*]}"
+        echo "是否安装这些工具？(按回车或输入y继续安装，输入n退出)"
+        read -r install_choice
+        
+        if [ -z "$install_choice" ] || [ "$install_choice" = "y" ] || [ "$install_choice" = "Y" ]; then
+            echo "正在安装必要的工具..."
+            
+            # 检查是否有 Homebrew
+            if ! command -v brew >/dev/null 2>&1; then
+                echo "未找到 Homebrew，正在安装..."
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                
+                # 添加 Homebrew 到 PATH（如果需要）
+                if ! command -v brew >/dev/null 2>&1; then
+                    echo "Homebrew 安装完成，但需要添加到 PATH"
+                    if [ -f "/opt/homebrew/bin/brew" ]; then
+                        eval "$(/opt/homebrew/bin/brew shellenv)"
+                    elif [ -f "/usr/local/bin/brew" ]; then
+                        eval "$(/usr/local/bin/brew shellenv)"
+                    else
+                        echo "无法找到 brew 命令，请手动添加 Homebrew 到 PATH"
+                        return 1
+                    fi
+                fi
+            fi
+            
+            # 使用 Homebrew 安装缺少的工具
+            for tool in "${missing_tools[@]}"; do
+                echo "安装 $tool..."
+                brew install "$tool"
+                
+                # 检查安装是否成功
+                if ! command -v "$tool" >/dev/null 2>&1; then
+                    echo "安装 $tool 失败，请手动安装"
+                    return 1
+                fi
+            done
+            
+            echo "所有必要的工具已安装完成"
+        else
+            echo "已取消安装，退出"
+            return 1
+        fi
+    fi
     
     if [ ! -d "$WORK_DIR" ]; then
         echo "创建开发目录: $WORK_DIR"
@@ -312,7 +359,7 @@ publish() {
     # 更新公式文件中的版本号和 SHA256
     echo "更新公式文件..."
     sed -i '' "s/VERSION = \"$CURRENT_VERSION\"/VERSION = \"$VERSION\"/" "$FORMULA_PATH"
-    OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d '"' -f 2)
+    OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d'"' -f2)
     sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
     
     # 更新脚本中的版本号
@@ -479,12 +526,59 @@ restoressh() {
     fi
     
     # 检查必要工具
+    missing_tools=()
     for tool in gpg ssh-add ssh; do
         if ! command -v $tool >/dev/null 2>&1; then
-            echo "错误：缺少必要的工具 $tool，请先安装"
-            return 1
+            missing_tools+=("$tool")
         fi
     done
+    
+    # 如果有缺少的工具，提示安装
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        echo "错误：缺少必要的工具：${missing_tools[*]}"
+        echo "是否安装这些工具？(按回车或输入y继续安装，输入n退出)"
+        read -r install_choice
+        
+        if [ -z "$install_choice" ] || [ "$install_choice" = "y" ] || [ "$install_choice" = "Y" ]; then
+            echo "正在安装必要的工具..."
+            
+            # 检查是否有 Homebrew
+            if ! command -v brew >/dev/null 2>&1; then
+                echo "未找到 Homebrew，正在安装..."
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                
+                # 添加 Homebrew 到 PATH（如果需要）
+                if ! command -v brew >/dev/null 2>&1; then
+                    echo "Homebrew 安装完成，但需要添加到 PATH"
+                    if [ -f "/opt/homebrew/bin/brew" ]; then
+                        eval "$(/opt/homebrew/bin/brew shellenv)"
+                    elif [ -f "/usr/local/bin/brew" ]; then
+                        eval "$(/usr/local/bin/brew shellenv)"
+                    else
+                        echo "无法找到 brew 命令，请手动添加 Homebrew 到 PATH"
+                        return 1
+                    fi
+                fi
+            fi
+            
+            # 使用 Homebrew 安装缺少的工具
+            for tool in "${missing_tools[@]}"; do
+                echo "安装 $tool..."
+                brew install "$tool"
+                
+                # 检查安装是否成功
+                if ! command -v "$tool" >/dev/null 2>&1; then
+                    echo "安装 $tool 失败，请手动安装"
+                    return 1
+                fi
+            done
+            
+            echo "所有必要的工具已安装完成"
+        else
+            echo "已取消安装，退出"
+            return 1
+        fi
+    fi
     
     # 将加密后的内容进行 base64 解码
     DECODED_KEY=$(echo "$ENCRYPTED_SSH_KEY" | base64 --decode)
