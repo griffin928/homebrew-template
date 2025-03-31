@@ -14,7 +14,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.47"
+VERSION="v1.0.48"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -57,7 +57,7 @@ dev() {
     # 检查是否已安装必要的工具
     missing_tools=()
     for tool in git gpg curl; do
-        if ! command -v $tool >/dev/null 2>&1; then
+        if ! command -v "$tool" >/dev/null 2>&1; then
             missing_tools+=("$tool")
         fi
     done
@@ -528,7 +528,7 @@ restoressh() {
     # 检查必要工具
     missing_tools=()
     for tool in gpg ssh-add ssh; do
-        if ! command -v $tool >/dev/null 2>&1; then
+        if ! command -v "$tool" &>/dev/null; then
             missing_tools+=("$tool")
         fi
     done
@@ -543,12 +543,12 @@ restoressh() {
             echo "正在安装必要的工具..."
             
             # 检查是否有 Homebrew
-            if ! command -v brew >/dev/null 2>&1; then
+            if ! command -v brew &>/dev/null; then
                 echo "未找到 Homebrew，正在安装..."
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
                 
                 # 添加 Homebrew 到 PATH（如果需要）
-                if ! command -v brew >/dev/null 2>&1; then
+                if ! command -v brew &>/dev/null; then
                     echo "Homebrew 安装完成，但需要添加到 PATH"
                     if [ -f "/opt/homebrew/bin/brew" ]; then
                         eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -567,7 +567,7 @@ restoressh() {
                 brew install "$tool"
                 
                 # 检查安装是否成功
-                if ! command -v "$tool" >/dev/null 2>&1; then
+                if ! command -v "$tool" &>/dev/null; then
                     echo "安装 $tool 失败，请手动安装"
                     return 1
                 fi
@@ -621,11 +621,11 @@ restoressh() {
     
     # 将私钥添加到 SSH agent
     echo "正在将私钥添加到 SSH agent..."
-    ssh-add -l > /dev/null 2>&1
+    ssh-add -l &>/dev/null
     if [ $? -eq 2 ]; then
         # SSH agent 未运行，启动它
         echo "启动 SSH agent..."
-        eval "$(ssh-agent)" > /dev/null
+        eval "$(ssh-agent)" &>/dev/null
     fi
     
     # 添加私钥到 SSH agent
