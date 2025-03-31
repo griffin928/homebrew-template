@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.16"
+VERSION="v1.0.17"
 
 # 存储加密后的 SSH 私钥内容
 ENCRYPTED_SSH_KEY=""
@@ -295,10 +295,22 @@ storessh() {
     
     # 检查 gpg 是否安装
     if ! command -v gpg >/dev/null 2>&1; then
-        echo "错误：未安装 gpg 命令，请先安装 GnuPG"
-        echo "可以使用以下命令安装："
-        echo "  brew install gnupg"
-        return 1
+        echo "未安装 gpg 命令，正在自动安装 GnuPG..."
+        if command -v brew >/dev/null 2>&1; then
+            brew install gnupg
+            if [ $? -ne 0 ]; then
+                echo "错误：安装 GnuPG 失败，请手动安装"
+                echo "可以使用以下命令安装："
+                echo "  brew install gnupg"
+                return 1
+            fi
+            echo "GnuPG 安装成功"
+        else
+            echo "错误：未安装 Homebrew，无法自动安装 GnuPG"
+            echo "请先安装 Homebrew，然后运行："
+            echo "  brew install gnupg"
+            return 1
+        fi
     fi
     
     # 查找所有私钥文件
