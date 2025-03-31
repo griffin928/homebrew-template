@@ -2,12 +2,12 @@ class Template < Formula
   # GitHub repository information
   GITHUB_USER = "griffin928"
   GITHUB_REPO = "homebrew-template"
-  VERSION = "v1.0.43"
+  VERSION = "v1.0.44"
 
   desc "My personal CLI tool for daily automation"
   homepage "https://github.com/#{GITHUB_USER}/#{GITHUB_REPO}"
   url "#{homepage}/archive/refs/tags/#{VERSION}.tar.gz"
-  sha256 "4051d7e44b6b4563d0934227898436f9f10bb60ea07ee091a6ce573c56e9cbf3"
+  sha256 "ebf4a2e919347435b964d8f1bdd4297ca40541dece522b00fc670b966c391def"
   license "MIT"
 
   def install
