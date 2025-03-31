@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.39"
+VERSION="v1.0.40"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -495,26 +495,35 @@ restoressh() {
         fi
     fi
     
-    echo "私钥已成功添加到 SSH agent"
-    
     # 更新 SSH 配置
     CONFIG_FILE="$SSH_DIR/config"
     
     # 检查是否已存在配置
-    if grep -q "Host github-${TOOL_NAME}" "$CONFIG_FILE" 2>/dev/null; then
+    if grep -q "Host github.com-${TOOL_NAME}" "$CONFIG_FILE" 2>/dev/null; then
         # 更新现有配置
         TMP_FILE=$(mktemp)
         awk -v tool="$TOOL_NAME" -v key="$SSH_KEY_FILE" '
-        /Host github-'$tool'/ {
+        /Host github.com-'$tool'/ {
             print $0;
             getline;
+            identities_seen = 0;  # 用于跟踪是否已经看到 IdentitiesOnly
             while ($0 !~ /^Host / && NF > 0) {
                 if ($1 == "IdentityFile") {
-                    print "  IdentityFile " key;
+                    print "    IdentityFile " key;
+                } else if ($1 == "IdentitiesOnly") {
+                    if (identities_seen == 0) {
+                        print "    IdentitiesOnly yes";
+                        identities_seen = 1;
+                    }
+                    # 如果已经看到过 IdentitiesOnly，就跳过这一行
                 } else {
                     print $0;
                 }
                 if (getline <= 0) break;
+            }
+            # 如果没有看到 IdentitiesOnly，添加一行
+            if (identities_seen == 0) {
+                print "    IdentitiesOnly yes";
             }
             if (NF > 0) print $0;
             next;
@@ -525,33 +534,21 @@ restoressh() {
     else
         # 添加新配置
         echo "" >> "$CONFIG_FILE"
-        echo "# 由 $TOOL_NAME 工具自动添加的配置" >> "$CONFIG_FILE"
-        echo "Host github-${TOOL_NAME}" >> "$CONFIG_FILE"
-        echo "  HostName github.com" >> "$CONFIG_FILE"
-        echo "  User git" >> "$CONFIG_FILE"
-        echo "  IdentityFile $SSH_KEY_FILE" >> "$CONFIG_FILE"
-        echo "  IdentitiesOnly yes" >> "$CONFIG_FILE"
+        echo "Host github.com-${TOOL_NAME}" >> "$CONFIG_FILE"
+        echo "    HostName github.com" >> "$CONFIG_FILE"
+        echo "    User git" >> "$CONFIG_FILE"
+        echo "    IdentityFile $SSH_KEY_FILE" >> "$CONFIG_FILE"
+        echo "    IdentitiesOnly yes" >> "$CONFIG_FILE"
     fi
     
     # 设置正确的权限
     chmod 600 "$CONFIG_FILE"
     
-    # 更新仓库 URL 使用特定主机
-    CUSTOM_SSH_REPO_URL=$(echo "$REPO_URL" | sed "s/git@github.com/git@github-${TOOL_NAME}/")
-    
-    echo "SSH 配置已更新，使用 $SSH_KEY_FILE 连接到 GitHub"
-    echo "自定义仓库 URL: $CUSTOM_SSH_REPO_URL"
-    
-    # 如果在工作目录中，更新远程 URL
-    if [ -d "$WORK_DIR/.git" ]; then
-        cd "$WORK_DIR" || return 1
-        git remote set-url origin "$CUSTOM_SSH_REPO_URL"
-        echo "已更新仓库 URL 使用特定 SSH 配置: $CUSTOM_SSH_REPO_URL"
-    fi
+    echo "私钥已成功添加到 SSH agent"
     
     # 测试 SSH 连接
     echo "测试 SSH 连接..."
-    SSH_TEST=$(ssh -T -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new "git@github-${TOOL_NAME}" 2>&1)
+    SSH_TEST=$(ssh -T -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new "git@github.com-${TOOL_NAME}" 2>&1)
     
     if echo "$SSH_TEST" | grep -q "successfully authenticated"; then
         USERNAME=$(echo "$SSH_TEST" | grep -o "Hi [^!]*" | cut -d' ' -f2)
