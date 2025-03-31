@@ -11,10 +11,11 @@ JETBRAINS_APPS=("PyCharm" "GoLand" "IntelliJ IDEA" "IntelliJ IDEA CE" "WebStorm"
 REPO_NAME="homebrew-${TOOL_NAME}"
 REPO_URL="git@github.com-${TOOL_NAME}:${GITHUB_USER}/${REPO_NAME}.git"
 WORK_DIR="$HOME/.${TOOL_NAME}"
-FORMULA_FILE="$WORK_DIR/template.rb"
+FORMULA_FILE="${TOOL_NAME}.rb"
+FORMULA_PATH="$WORK_DIR/$FORMULA_FILE"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.50"
+VERSION="v1.0.51"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -43,8 +44,8 @@ show_help() {
 
 # 获取当前版本号
 get_current_version() {
-    if [ -f "$FORMULA_FILE" ]; then
-        grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2
+    if [ -f "$FORMULA_PATH" ]; then
+        grep 'VERSION = ' "$FORMULA_PATH" | cut -d'"' -f2
     elif [ -n "$VERSION" ] && [ "$VERSION" != "@@VERSION@@" ]; then
         echo "$VERSION"
     else
@@ -143,9 +144,11 @@ dev() {
     fi
     
     # 检查公式文件是否存在
-    if [ ! -f "$WORK_DIR/$FORMULA_FILE" ]; then
-        echo "错误：$FORMULA_FILE 未找到。请确保仓库结构正确。"
-        return 1
+    if [ ! -f "$FORMULA_PATH" ]; then
+        echo "注意：$FORMULA_PATH 未找到。这可能是正常的，如果这是一个新仓库。"
+        echo "如果需要，您可以创建这个文件。"
+    else
+        echo "公式文件已存在: $FORMULA_PATH"
     fi
     
     # 设置 Git 用户信息（如果未设置）
@@ -279,18 +282,29 @@ get_next_available_version() {
 get_github_archive_sha256() {
     VERSION=$1
     ARCHIVE_URL="https://github.com/${GITHUB_USER}/${GITHUB_REPO}/archive/refs/tags/${VERSION}.tar.gz"
-    TEMP_FILE="/tmp/${PACKAGE_NAME}-${VERSION}.tar.gz"
     
-    # 下载文件
-    curl -sL "$ARCHIVE_URL" -o "$TEMP_FILE"
-    
-    # 计算 SHA256
-    SHA256=$(shasum -a 256 "$TEMP_FILE" | cut -d' ' -f1)
-    
-    # 删除临时文件
-    rm "$TEMP_FILE"
-    
+    # 直接从 GitHub 下载并计算 SHA256
+    SHA256=$(curl -sL "$ARCHIVE_URL" | shasum -a 256 | cut -d ' ' -f1)
     echo "$SHA256"
+}
+
+# 更新 Homebrew formula 文件
+update_formula() {
+    VERSION=$1
+    SHA256=$2
+    
+    if [ -f "$FORMULA_PATH" ]; then
+        # 更新版本号
+        sed -i '' "s/VERSION = \".*\"/VERSION = \"$VERSION\"/" "$FORMULA_PATH"
+        
+        # 更新 SHA256
+        sed -i '' "s/sha256 \".*\"/sha256 \"$SHA256\"/" "$FORMULA_PATH"
+        
+        echo "Formula 已更新: $FORMULA_PATH"
+    else
+        echo "错误: Formula 文件不存在: $FORMULA_PATH"
+        return 1
+    fi
 }
 
 publish() {
@@ -311,8 +325,7 @@ publish() {
     echo "新版本: $VERSION"
     
     # 更新公式文件中的版本号
-    FORMULA_PATH="$FORMULA_FILE"
-    echo "更新公式文件: $FORMULA_PATH"
+    echo "更新公式文件..."
     
     # 首先更新脚本中的版本号
     echo "更新脚本版本号..."
@@ -377,9 +390,7 @@ publish() {
     
     # 更新公式文件中的版本号和 SHA256
     echo "更新公式文件..."
-    sed -i '' "s/VERSION = \"$CURRENT_VERSION\"/VERSION = \"$VERSION\"/" "$FORMULA_PATH"
-    OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d'"' -f2)
-    sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
+    update_formula "$VERSION" "$ACTUAL_SHA256"
     
     echo "版本号已成功更新到 $VERSION"
     
