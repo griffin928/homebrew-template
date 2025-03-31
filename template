@@ -12,7 +12,7 @@ REPO_NAME="homebrew-${TOOL_NAME}"
 REPO_URL="git@github.com:${GITHUB_USER}/${REPO_NAME}.git"
 CUSTOM_SSH_REPO_URL=""  # 特定 SSH 配置的仓库 URL，默认为空
 WORK_DIR="$HOME/.${TOOL_NAME}"
-FORMULA_FILE="homebrew-template.rb"
+FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
 VERSION="v1.0.17"
@@ -36,10 +36,10 @@ show_help() {
 
 # 获取当前版本号
 get_current_version() {
-    if [ "$VERSION" != "@@VERSION@@" ]; then
-        echo "$VERSION"
-    elif [ -f "$FORMULA_FILE" ]; then
+    if [ -f "$FORMULA_FILE" ]; then
         grep 'VERSION = ' "$FORMULA_FILE" | cut -d'"' -f2
+    elif [ "$VERSION" != "@@VERSION@@" ]; then
+        echo "$VERSION"
     else
         echo "unknown"
     fi
@@ -271,23 +271,9 @@ publish() {
     echo "当前版本: $CURRENT_VERSION"
     echo "新版本: $VERSION"
     
-    # 更新脚本中的版本号
-    echo "更新脚本版本号..."
-    TOOL_PATH="$PROJECT_DIR/template"
-    if [ -f "$TOOL_PATH" ]; then
-        sed -i '' "s/VERSION=\"$CURRENT_VERSION\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
-    fi
-    
-    # 提交脚本更改并推送
-    echo "提交脚本更改..."
-    git add "$TOOL_PATH"
-    git commit -m "Bump version to $VERSION"
-    git push
-    
     # 创建并推送标签
-    echo "创建并推送标签 $VERSION..."
+    echo "创建标签 $VERSION..."
     git tag "$VERSION"
-    git push origin "$VERSION"
     
     # 计算新版本的 SHA256
     echo "计算新版本的 SHA256 值..."
@@ -296,6 +282,8 @@ publish() {
     
     if [ -z "$NEW_SHA256" ]; then
         echo "错误：无法计算 SHA256 值，请检查网络连接或标签是否已推送"
+        # 删除刚才创建的标签
+        git tag -d "$VERSION"
         return 1
     fi
     
@@ -307,11 +295,22 @@ publish() {
     OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d '"' -f 2)
     sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$NEW_SHA256\"/" "$FORMULA_PATH"
     
-    # 提交公式更改并推送
-    echo "提交公式更改..."
-    git add "$FORMULA_PATH"
-    git commit -m "更新公式文件到 $VERSION 并更新 SHA256"
+    # 更新脚本中的版本号
+    echo "更新脚本版本号..."
+    TOOL_PATH="$PROJECT_DIR/template"
+    if [ -f "$TOOL_PATH" ]; then
+        sed -i '' "s/VERSION=\"$CURRENT_VERSION\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+    fi
+    
+    # 提交所有更改并推送
+    echo "提交所有更改..."
+    git add "$FORMULA_PATH" "$TOOL_PATH"
+    git commit -m "发布版本 $VERSION 并更新 SHA256"
     git push
+    
+    # 推送标签
+    echo "推送标签 $VERSION..."
+    git push origin "$VERSION"
     
     echo "版本 $VERSION 已完全发布"
     echo "可以使用以下命令安装新版本："
@@ -619,7 +618,7 @@ case "$1" in
         restoressh
         ;;
     "-v")
-        echo "$VERSION"
+        get_current_version
         ;;
     "-h"|"--help"|"")
         show_help
