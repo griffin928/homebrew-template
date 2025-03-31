@@ -9,13 +9,12 @@ JETBRAINS_APPS=("PyCharm" "GoLand" "IntelliJ IDEA" "IntelliJ IDEA CE" "WebStorm"
 
 # 配置
 REPO_NAME="homebrew-${TOOL_NAME}"
-REPO_URL="git@github.com:${GITHUB_USER}/${REPO_NAME}.git"
-CUSTOM_SSH_REPO_URL=""  # 特定 SSH 配置的仓库 URL，默认为空
+REPO_URL="git@github.com-${TOOL_NAME}:${GITHUB_USER}/${REPO_NAME}.git"
 WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.41"
+VERSION="v1.0.42"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -55,11 +54,7 @@ dev() {
         mkdir -p "$WORK_DIR"
         
         # 使用自定义 SSH 仓库 URL（如果有）
-        if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
-            git clone "$CUSTOM_SSH_REPO_URL" "$WORK_DIR"
-        else
-            git clone "$REPO_URL" "$WORK_DIR"
-        fi
+        git clone "$REPO_URL" "$WORK_DIR"
         
         echo "仓库已克隆到 $WORK_DIR"
     else
@@ -67,11 +62,7 @@ dev() {
         cd "$WORK_DIR" || return 1
         
         # 确保远程 URL 是正确的
-        if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
-            git remote set-url origin "$CUSTOM_SSH_REPO_URL"
-        else
-            git remote set-url origin "$REPO_URL"
-        fi
+        git remote set-url origin "$REPO_URL"
         
         # 拉取最新更改
         echo "拉取最新更改..."
