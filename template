@@ -15,7 +15,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/homebrew-template.rb"
 PACKAGE_NAME="${REPO_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.26"
+VERSION="v1.0.27"
 
 # 存储加密后的 SSH 私钥内容
 ENCRYPTED_SSH_KEY="LS0tLS1CRUdJTiBQR1AgTUVTU0FHRS0tLS0tCgpqQTBFQ1FNSUkxTFc3N3dTNlVYKzBzQ1JBUjE4Y0FTQVlpTEMwdVQyUW1TV08rZ1lqTGVjRm1rNnRjQk1ScHlOCmphZG5va1N0dXk0cVoxYXZSMmZVcjZ6T2pzUWlxNEVNSGEyRVZVSG9xWGJJRVowMFRwMjdwUFQ0dUJ4Z1ZqaWMKV1pCYTBSSlcrMmtNL2RSNFlYNWFCRFMvanFEV1NlSWtYd2pVMkRTMXBoQkd4cFhkNmFad0N0UHhCOVJXVHlXQQpPWDRwYzZOUDBjdTkxdktacmI0UlBManMwRlQyODVKUW5QOVBsem9MbVhnaEZmZERoKzNvbmFkR3VrVERJZDBJClovUVJNekVacDg3VVNOOEhlNkpMQkJ5SmRjWjN2K2k0M1dxc0Q4RjJJNGloejRnQVpPcnF6RmlUY05YK2o3WEwKR2NyQTJLdjB6Zk9Gd1BhV0RIREYxTXZtdEx2cUtkeUFoMkRuVXZWYmtHb1J6U251T0xTeUF5SzJQL0NKdnRraAp2TXJJaEtaS2kvdE41Q0QzU1pTVFM0VWhzNmtVSDM3enNiclJRYXVDUHVVRW80RmhuQllTSmhrQXl5bHNiRTB3CkVtdFIrNmRDclM0YzJzeUxYajFrSG9Rd1BnPT0KPW5WRncKLS0tLS1FTkQgUEdQIE1FU1NBR0UtLS0tLQo="
@@ -172,7 +172,7 @@ get_next_available_version() {
     # 增加补丁版本号直到找到未使用的版本号
     while true; do
         PATCH=$((PATCH + 1))
-        NEW_VERSION="v1.0.26"
+        NEW_VERSION="v1.0.27"
         
         # 检查本地标签
         if ! git tag | grep -q "^$NEW_VERSION\$"; then
@@ -208,138 +208,79 @@ get_github_archive_sha256() {
 }
 
 publish() {
-    # 首先检查是否在项目根目录
-    if [ -f "homebrew-template.rb" ]; then
-        # 当前目录是项目根目录
-        FORMULA_PATH="$(pwd)/homebrew-template.rb"
-        PROJECT_DIR="$(pwd)"
-    elif [ -f "$WORK_DIR/homebrew-template.rb" ]; then
-        # 工作目录中有公式文件
-        FORMULA_PATH="$WORK_DIR/homebrew-template.rb"
-        PROJECT_DIR="$WORK_DIR"
-        echo "在工作目录 $WORK_DIR 中发布..."
-        cd "$WORK_DIR" || {
-            echo "无法切换到工作目录 $WORK_DIR"
-            return 1
-        }
-    else
-        # 检查工作目录是否存在
-        if [ ! -d "$WORK_DIR" ]; then
-            echo "错误：工作目录 $WORK_DIR 不存在"
-            echo "请先运行 $TOOL_NAME dev 命令创建工作目录"
-            return 1
-        fi
-        
-        # 工作目录存在但没有公式文件，尝试克隆仓库
-        echo "工作目录存在但没有公式文件，尝试克隆仓库..."
-        cd "$WORK_DIR" || {
-            echo "无法切换到工作目录 $WORK_DIR"
-            return 1
-        }
-        
-        # 检查是否已经是 Git 仓库
-        if [ -d ".git" ]; then
-            echo "工作目录已经是 Git 仓库，尝试拉取最新更改..."
-            git pull
-        else
-            echo "克隆仓库到工作目录..."
-            # 使用自定义 SSH 仓库 URL（如果有）
-            if [ -n "$CUSTOM_SSH_REPO_URL" ]; then
-                git clone "$CUSTOM_SSH_REPO_URL" .
-            else
-                git clone "$REPO_URL" .
-            fi
-        fi
-        
-        # 再次检查公式文件是否存在
-        if [ -f "homebrew-template.rb" ]; then
-            FORMULA_PATH="$(pwd)/homebrew-template.rb"
-            PROJECT_DIR="$(pwd)"
-        else
-            echo "错误：克隆仓库后仍然找不到 homebrew-template.rb 文件"
-            return 1
-        fi
-    fi
+    echo "发布新版本..."
     
-    # 拉取最新更改
-    echo "拉取最新更改..."
-    git pull
+    # 确保在正确的目录
+    cd "$WORK_DIR" || {
+        echo "切换到工作目录失败: $WORK_DIR"
+        return 1
+    }
     
-    # 获取当前版本和下一个版本
+    # 获取当前版本
     CURRENT_VERSION=$(get_current_version)
-    VERSION=$(get_next_available_version)
-    
     echo "当前版本: $CURRENT_VERSION"
+    
+    # 获取下一个可用版本
+    VERSION=$(get_next_available_version)
     echo "新版本: $VERSION"
+    
+    # 更新公式文件中的版本号
+    FORMULA_PATH="$WORK_DIR/homebrew-template.rb"
+    echo "更新公式文件: $FORMULA_PATH"
     
     # 创建并推送标签
     echo "创建标签 $VERSION..."
     git tag "$VERSION"
     
-    # 使用轮询方式等待 GitHub 生成压缩包并计算 SHA256
+    # 推送标签
+    echo "推送标签 $VERSION..."
+    git push origin "$VERSION"
+    
+    # 等待 GitHub 生成压缩包
+    echo "等待 GitHub 生成压缩包..."
+    
+    # 设置最大重试次数和等待时间
     MAX_ATTEMPTS=10
     ATTEMPT=1
-    LAST_SHA256=""
+    DOWNLOAD_URL="https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz"
     
-    echo "等待 GitHub 生成压缩包并验证其完整性..."
+    # 使用重试机制获取稳定的 SHA256
     while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-        echo "尝试 $ATTEMPT/$MAX_ATTEMPTS..."
+        echo "尝试 $ATTEMPT/$MAX_ATTEMPTS 获取 SHA256..."
         
-        # 下载并计算 SHA256
-        DOWNLOAD_URL="https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz"
-        CURRENT_SHA256=$(curl -sL "$DOWNLOAD_URL" | shasum -a 256 | cut -d ' ' -f1)
+        # 直接从 GitHub 下载并计算 SHA256
+        ACTUAL_SHA256=$(curl -sL "$DOWNLOAD_URL" | shasum -a 256 | cut -d ' ' -f1)
         
         # 检查是否获取到有效的 SHA256
-        if [ -z "$CURRENT_SHA256" ] || [ "$CURRENT_SHA256" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]; then
+        if [ -z "$ACTUAL_SHA256" ] || [ "$ACTUAL_SHA256" = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" ]; then
             # 空文件或无效响应的 SHA256，等待并重试
-            echo "  GitHub 尚未生成压缩包，等待 3 秒后重试..."
-            sleep 3
+            echo "  GitHub 压缩包尚未准备好，等待 5 秒后重试..."
+            sleep 5
             ATTEMPT=$((ATTEMPT + 1))
             continue
-        fi
-        
-        # 如果这是第一次获取有效的 SHA256，或者与上次不同
-        if [ -z "$LAST_SHA256" ]; then
-            echo "  首次获取 SHA256: $CURRENT_SHA256"
-            LAST_SHA256="$CURRENT_SHA256"
-            # 等待并再次检查以确保稳定
-            sleep 2
-            continue
-        elif [ "$CURRENT_SHA256" != "$LAST_SHA256" ]; then
-            echo "  SHA256 值不稳定，上次: $LAST_SHA256，当前: $CURRENT_SHA256"
-            echo "  等待 2 秒后重试..."
-            LAST_SHA256="$CURRENT_SHA256"
-            sleep 2
-            continue
         else
-            # SHA256 值连续两次相同，认为是稳定的
-            echo "  SHA256 值已稳定: $CURRENT_SHA256"
-            NEW_SHA256="$CURRENT_SHA256"
+            # 获取到有效的 SHA256
+            echo "  成功获取 SHA256: $ACTUAL_SHA256"
             break
         fi
     done
     
     if [ $ATTEMPT -gt $MAX_ATTEMPTS ]; then
-        echo "错误：无法获取稳定的 SHA256 值，请稍后手动更新"
-        echo "最后获取的 SHA256 值: $LAST_SHA256"
-        # 继续执行，但稍后可能需要手动更新 SHA256
-        NEW_SHA256="$LAST_SHA256"
+        echo "错误：无法获取有效的 SHA256 值，请稍后手动更新"
+        return 1
     fi
-    
-    echo "新的 SHA256: $NEW_SHA256"
     
     # 更新公式文件中的版本号和 SHA256
     echo "更新公式文件..."
     sed -i '' "s/VERSION = \"$CURRENT_VERSION\"/VERSION = \"$VERSION\"/" "$FORMULA_PATH"
     OLD_SHA256=$(grep -o 'sha256 "[^"]*"' "$FORMULA_PATH" | cut -d '"' -f 2)
-    sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$NEW_SHA256\"/" "$FORMULA_PATH"
+    sed -i '' "s/sha256 \"$OLD_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
     
     # 更新脚本中的版本号
     echo "更新脚本版本号..."
-    TOOL_PATH="$PROJECT_DIR/template"
+    TOOL_PATH="$WORK_DIR/template"
     
     if [ -f "$TOOL_PATH" ]; then
-        # 使用更通用的正则表达式匹配 VERSION="v1.0.26"
         sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
     fi
     
@@ -351,37 +292,7 @@ publish() {
     git commit -m "发布版本 $VERSION 并更新 SHA256"
     git push
     
-    # 推送标签
-    echo "推送标签 $VERSION..."
-    git push origin "$VERSION"
-    
     echo "版本 $VERSION 已完全发布"
-    
-    # 自动验证和修复 SHA256
-    echo "验证 SHA256 值是否正确..."
-    sleep 5  # 给 GitHub 一些时间来完全处理
-    
-    # 获取实际的 SHA256 值
-    ACTUAL_SHA256=$(curl -sL "https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz" | shasum -a 256 | cut -d ' ' -f1)
-    
-    if [ "$ACTUAL_SHA256" != "$NEW_SHA256" ]; then
-        echo "SHA256 值不匹配，自动修复中..."
-        echo "预期: $NEW_SHA256"
-        echo "实际: $ACTUAL_SHA256"
-        
-        # 更新公式文件中的 SHA256
-        sed -i '' "s/sha256 \"$NEW_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
-        
-        # 提交并推送更改
-        git add "$FORMULA_PATH"
-        git commit -m "自动修复 SHA256 值为 $ACTUAL_SHA256"
-        git push
-        
-        echo "SHA256 值已自动修复"
-    else
-        echo "SHA256 值正确，无需修复"
-    fi
-    
     echo "可以使用以下命令安装新版本："
     echo "  brew update && brew upgrade $PACKAGE_NAME"
     return 0
