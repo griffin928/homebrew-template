@@ -353,6 +353,32 @@ publish() {
     git push origin "$VERSION"
     
     echo "版本 $VERSION 已完全发布"
+    
+    # 自动验证和修复 SHA256
+    echo "验证 SHA256 值是否正确..."
+    sleep 5  # 给 GitHub 一些时间来完全处理
+    
+    # 获取实际的 SHA256 值
+    ACTUAL_SHA256=$(curl -sL "https://github.com/$GITHUB_USER/$REPO_NAME/archive/refs/tags/$VERSION.tar.gz" | shasum -a 256 | cut -d ' ' -f1)
+    
+    if [ "$ACTUAL_SHA256" != "$NEW_SHA256" ]; then
+        echo "SHA256 值不匹配，自动修复中..."
+        echo "预期: $NEW_SHA256"
+        echo "实际: $ACTUAL_SHA256"
+        
+        # 更新公式文件中的 SHA256
+        sed -i '' "s/sha256 \"$NEW_SHA256\"/sha256 \"$ACTUAL_SHA256\"/" "$FORMULA_PATH"
+        
+        # 提交并推送更改
+        git add "$FORMULA_PATH"
+        git commit -m "自动修复 SHA256 值为 $ACTUAL_SHA256"
+        git push
+        
+        echo "SHA256 值已自动修复"
+    else
+        echo "SHA256 值正确，无需修复"
+    fi
+    
     echo "可以使用以下命令安装新版本："
     echo "  brew update && brew upgrade $PACKAGE_NAME"
     return 0
