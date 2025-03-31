@@ -14,7 +14,7 @@ WORK_DIR="$HOME/.${TOOL_NAME}"
 FORMULA_FILE="$WORK_DIR/template.rb"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.45"
+VERSION="v1.0.46"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -29,11 +29,16 @@ show_help() {
     echo "Commands:"
     echo "  dev         Clone/update repository for development"
     echo "  publish     Publish a new version (auto-incrementing)"
-    echo "  upgrade    Force upgrade to the latest version"
-    echo "  -v         Show version"
-    echo "  -h         Show this help message"
-    echo "  storessh   加密并存储 SSH 私钥"
+    echo "  upgrade     Force upgrade to the latest version"
+    echo "  -v          Show version"
+    echo "  -h          Show this help message"
+    echo "  storessh    加密并存储 SSH 私钥"
     echo "  restoressh  解密并使用 SSH 私钥"
+    echo ""
+    echo "在新电脑上首次使用的步骤:"
+    echo "  1. 安装工具: brew tap ${GITHUB_USER}/${TOOL_NAME} && brew install ${TOOL_NAME}"
+    echo "  2. 设置 SSH 密钥: ${TOOL_NAME} restoressh"
+    echo "  3. 克隆开发仓库: ${TOOL_NAME} dev"
 }
 
 # 获取当前版本号
@@ -63,11 +68,11 @@ dev() {
         
         # 克隆仓库
         echo "克隆仓库: $REPO_URL"
-        git clone "$REPO_URL" "$WORK_DIR"
-        
-        if [ $? -ne 0 ]; then
+        if ! git clone "$REPO_URL" "$WORK_DIR"; then
             echo "克隆仓库失败，可能需要先运行 restoressh 命令设置 SSH 密钥"
             echo "请运行: $0 restoressh"
+            # 删除可能部分创建的目录
+            [ -d "$WORK_DIR" ] && rm -rf "$WORK_DIR"
             return 1
         fi
         
@@ -458,6 +463,7 @@ restoressh() {
     if [ -z "$SYSTEM_TEMPLATE" ]; then
         echo "错误：未找到系统安装的 template 工具"
         echo "请确保 template 已正确安装并添加到 PATH 中"
+        echo "安装命令: brew tap ${GITHUB_USER}/${TOOL_NAME} && brew install ${TOOL_NAME}"
         return 1
     fi
     
@@ -471,6 +477,14 @@ restoressh() {
         echo "请先运行 $TOOL_NAME storessh 命令加密 SSH 私钥"
         return 1
     fi
+    
+    # 检查必要工具
+    for tool in gpg ssh-add ssh; do
+        if ! command -v $tool >/dev/null 2>&1; then
+            echo "错误：缺少必要的工具 $tool，请先安装"
+            return 1
+        fi
+    done
     
     # 将加密后的内容进行 base64 解码
     DECODED_KEY=$(echo "$ENCRYPTED_SSH_KEY" | base64 --decode)
@@ -488,6 +502,7 @@ restoressh() {
     # 创建 SSH 目录（如果不存在）
     SSH_DIR="$HOME/.ssh"
     mkdir -p "$SSH_DIR"
+    chmod 700 "$SSH_DIR"
     
     # 设置 SSH 私钥文件路径
     SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
@@ -512,21 +527,29 @@ restoressh() {
     
     # 将私钥添加到 SSH agent
     echo "正在将私钥添加到 SSH agent..."
-    ssh-add "$SSH_KEY_FILE" 2>/dev/null
-    
-    if [ $? -ne 0 ]; then
-        # 如果 SSH agent 未运行，尝试启动它
+    ssh-add -l > /dev/null 2>&1
+    if [ $? -eq 2 ]; then
+        # SSH agent 未运行，启动它
+        echo "启动 SSH agent..."
         eval "$(ssh-agent)" > /dev/null
-        ssh-add "$SSH_KEY_FILE"
-        
-        if [ $? -ne 0 ]; then
-            echo "无法将私钥添加到 SSH agent"
-            return 1
-        fi
+    fi
+    
+    # 添加私钥到 SSH agent
+    ssh-add "$SSH_KEY_FILE" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "警告：无法将私钥添加到 SSH agent，但将继续配置 SSH"
+    else
+        echo "私钥已成功添加到 SSH agent"
     fi
     
     # 更新 SSH 配置
     CONFIG_FILE="$SSH_DIR/config"
+    
+    # 如果配置文件不存在，创建它
+    if [ ! -f "$CONFIG_FILE" ]; then
+        touch "$CONFIG_FILE"
+        chmod 600 "$CONFIG_FILE"
+    fi
     
     # 检查是否已存在配置
     if grep -q "^Host github.com-${TOOL_NAME}$" "$CONFIG_FILE" 2>/dev/null; then
@@ -590,8 +613,6 @@ restoressh() {
     # 设置正确的权限
     chmod 600 "$CONFIG_FILE"
     
-    echo "私钥已成功添加到 SSH agent"
-    
     # 测试 SSH 连接
     echo "测试 SSH 连接..."
     SSH_TEST=$(ssh -T -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new "git@github.com-${TOOL_NAME}" 2>&1)
@@ -599,10 +620,18 @@ restoressh() {
     if echo "$SSH_TEST" | grep -q "successfully authenticated"; then
         USERNAME=$(echo "$SSH_TEST" | grep -o "Hi [^!]*" | cut -d' ' -f2)
         echo "  SSH 认证成功，用户名: $USERNAME"
+        echo ""
+        echo "现在您可以运行以下命令开始开发:"
+        echo "  $0 dev"
         return 0
     else
         echo "  SSH 认证失败，请检查 SSH 密钥和配置"
         echo "  错误信息: $SSH_TEST"
+        echo ""
+        echo "可能的解决方法:"
+        echo "  1. 确保您的 GitHub 账户已添加此 SSH 密钥"
+        echo "  2. 检查网络连接"
+        echo "  3. 尝试手动测试连接: ssh -T git@github.com-${TOOL_NAME}"
         return 1
     fi
 }
