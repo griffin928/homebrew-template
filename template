@@ -15,7 +15,7 @@ FORMULA_FILE="${TOOL_NAME}.rb"
 FORMULA_PATH="$WORK_DIR/$FORMULA_FILE"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.58"
+VERSION="v1.0.59"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -373,12 +373,26 @@ publish() {
     
     if [ -f "$TOOL_PATH" ]; then
         # 更新脚本中的 VERSION 变量
-        sed -i '' "s/VERSION=\"[^\"]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+        sed -i '' "s/VERSION=\"v[0-9]*\.[0-9]*\.[0-9]*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
         
         # 确保更新成功
         if ! grep -q "VERSION=\"$VERSION\"" "$TOOL_PATH"; then
             echo "警告：无法更新脚本中的版本号，请手动检查"
+            echo "尝试使用更精确的模式匹配..."
+            # 尝试另一种模式匹配方式
+            sed -i '' "s/VERSION=\".*\"/VERSION=\"$VERSION\"/" "$TOOL_PATH"
+            
+            # 再次检查
+            if ! grep -q "VERSION=\"$VERSION\"" "$TOOL_PATH"; then
+                echo "错误：无法更新脚本版本号，发布过程中断"
+                return 1
+            fi
         fi
+        
+        echo "脚本版本号已更新为 $VERSION"
+    else
+        echo "错误：找不到脚本文件 $TOOL_PATH"
+        return 1
     fi
     
     # 提交版本号更新
@@ -593,7 +607,6 @@ restoressh() {
     # 创建 SSH 目录（如果不存在）
     setup_ssh_dir
     
-    # 设置 SSH 私钥文件路径
     SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
     
     # 解密私钥并写入文件
