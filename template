@@ -15,7 +15,7 @@ FORMULA_FILE="${TOOL_NAME}.rb"
 FORMULA_PATH="$WORK_DIR/$FORMULA_FILE"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.55"
+VERSION="v1.0.56"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -177,7 +177,7 @@ dev() {
     if [ -d "/Applications/Windsurf.app" ]; then
         echo "尝试使用 Windsurf 打开工作目录..."
         open -a Windsurf "$WORK_DIR"
-        return 0
+        echo "已尝试打开 Windsurf，如果 Windsurf 显示没有工作区，请手动设置工作区为: $WORK_DIR"
     fi
     
     # 打开编辑器（如果有）
