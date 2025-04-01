@@ -42,22 +42,14 @@ show_help() {
     echo "  3. 克隆开发仓库: ${TOOL_NAME} dev"
 }
 
-# 获取当前版本号
-get_current_version() {
-    if [ -f "$FORMULA_PATH" ]; then
-        grep 'VERSION = ' "$FORMULA_PATH" | cut -d'"' -f2
-    elif [ -n "$VERSION" ] && [ "$VERSION" != "@@VERSION@@" ]; then
-        echo "$VERSION"
-    else
-        echo "unknown"
-    fi
-}
-
-# 命令处理函数
-dev() {
+# 检查并安装必要的工具
+check_and_install_tools() {
+    # 第一个参数是工具列表，以空格分隔
+    tools_to_check="$1"
+    
     # 检查是否已安装必要的工具
     missing_tools=()
-    for tool in git gpg curl; do
+    for tool in $tools_to_check; do
         if ! command -v "$tool" >/dev/null 2>&1; then
             missing_tools+=("$tool")
         fi
@@ -104,10 +96,41 @@ dev() {
             done
             
             echo "所有必要的工具已安装完成"
+            return 0
         else
             echo "已取消安装，退出"
             return 1
         fi
+    fi
+    
+    # 如果没有缺少的工具，直接返回成功
+    return 0
+}
+
+# 创建 SSH 目录并设置权限
+setup_ssh_dir() {
+    SSH_DIR="$HOME/.ssh"
+    mkdir -p "$SSH_DIR"
+    chmod 700 "$SSH_DIR"
+    return 0
+}
+
+# 获取当前版本号
+get_current_version() {
+    if [ -f "$FORMULA_PATH" ]; then
+        grep 'VERSION = ' "$FORMULA_PATH" | cut -d'"' -f2
+    elif [ -n "$VERSION" ] && [ "$VERSION" != "@@VERSION@@" ]; then
+        echo "$VERSION"
+    else
+        echo "unknown"
+    fi
+}
+
+# 命令处理函数
+dev() {
+    # 检查是否已安装必要的工具
+    if ! check_and_install_tools "git gpg curl"; then
+        return 1
     fi
     
     if [ ! -d "$WORK_DIR" ]; then
@@ -115,7 +138,7 @@ dev() {
         mkdir -p "$WORK_DIR"
         
         # 检查 SSH 私钥文件是否存在
-        SSH_DIR="$HOME/.ssh"
+        setup_ssh_dir
         SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
         if [ ! -f "$SSH_KEY_FILE" ]; then
             echo "未找到 SSH 私钥文件，需要先运行 restoressh 命令设置 SSH 密钥"
@@ -435,27 +458,12 @@ storessh() {
     fi
     
     # 检查 gpg 是否安装
-    if ! command -v gpg >/dev/null 2>&1; then
-        echo "未安装 gpg 命令，正在自动安装 GnuPG..."
-        if command -v brew >/dev/null 2>&1; then
-            brew install gnupg
-            if [ $? -ne 0 ]; then
-                echo "错误：安装 GnuPG 失败，请手动安装"
-                echo "可以使用以下命令安装："
-                echo "  brew install gnupg"
-                return 1
-            fi
-            echo "GnuPG 安装成功"
-        else
-            echo "错误：未安装 Homebrew，无法自动安装 GnuPG"
-            echo "请先安装 Homebrew，然后运行："
-            echo "  brew install gnupg"
-            return 1
-        fi
+    if ! check_and_install_tools "gpg"; then
+        return 1
     fi
     
     # 查找所有私钥文件
-    SSH_DIR="$HOME/.ssh"
+    setup_ssh_dir
     
     # 检查 SSH 目录是否存在
     if [ ! -d "$SSH_DIR" ]; then
@@ -565,58 +573,8 @@ restoressh() {
     fi
     
     # 检查必要工具
-    missing_tools=()
-    for tool in gpg ssh-add ssh; do
-        if ! command -v "$tool" &>/dev/null; then
-            missing_tools+=("$tool")
-        fi
-    done
-    
-    # 如果有缺少的工具，提示安装
-    if [ ${#missing_tools[@]} -gt 0 ]; then
-        echo "错误：缺少必要的工具：${missing_tools[*]}"
-        echo "是否安装这些工具？(按回车或输入y继续安装，输入n退出)"
-        read -r install_choice
-        
-        if [ -z "$install_choice" ] || [ "$install_choice" = "y" ] || [ "$install_choice" = "Y" ]; then
-            echo "正在安装必要的工具..."
-            
-            # 检查是否有 Homebrew
-            if ! command -v brew &>/dev/null; then
-                echo "未找到 Homebrew，正在安装..."
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                
-                # 添加 Homebrew 到 PATH（如果需要）
-                if ! command -v brew &>/dev/null; then
-                    echo "Homebrew 安装完成，但需要添加到 PATH"
-                    if [ -f "/opt/homebrew/bin/brew" ]; then
-                        eval "$(/opt/homebrew/bin/brew shellenv)"
-                    elif [ -f "/usr/local/bin/brew" ]; then
-                        eval "$(/usr/local/bin/brew shellenv)"
-                    else
-                        echo "无法找到 brew 命令，请手动添加 Homebrew 到 PATH"
-                        return 1
-                    fi
-                fi
-            fi
-            
-            # 使用 Homebrew 安装缺少的工具
-            for tool in "${missing_tools[@]}"; do
-                echo "安装 $tool..."
-                brew install "$tool"
-                
-                # 检查安装是否成功
-                if ! command -v "$tool" &>/dev/null; then
-                    echo "安装 $tool 失败，请手动安装"
-                    return 1
-                fi
-            done
-            
-            echo "所有必要的工具已安装完成"
-        else
-            echo "已取消安装，退出"
-            return 1
-        fi
+    if ! check_and_install_tools "gpg ssh-add ssh"; then
+        return 1
     fi
     
     # 将加密后的内容进行 base64 解码
@@ -633,9 +591,7 @@ restoressh() {
     echo "$DECODED_KEY" > "$TEMP_ENCRYPTED_KEY"
     
     # 创建 SSH 目录（如果不存在）
-    SSH_DIR="$HOME/.ssh"
-    mkdir -p "$SSH_DIR"
-    chmod 700 "$SSH_DIR"
+    setup_ssh_dir
     
     # 设置 SSH 私钥文件路径
     SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
