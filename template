@@ -15,7 +15,7 @@ FORMULA_FILE="${TOOL_NAME}.rb"
 FORMULA_PATH="$WORK_DIR/$FORMULA_FILE"
 PACKAGE_NAME="${TOOL_NAME}"
 GITHUB_REPO="${REPO_NAME}"
-VERSION="v1.0.53"
+VERSION="v1.0.57"
 
 # 新增全局变量，用于版本计算
 NEXT_VERSION_TEMPLATE="v\$MAJOR.\$MINOR.\$PATCH"
@@ -114,6 +114,23 @@ dev() {
         echo "创建开发目录: $WORK_DIR"
         mkdir -p "$WORK_DIR"
         
+        # 检查 SSH 私钥文件是否存在
+        SSH_DIR="$HOME/.ssh"
+        SSH_KEY_FILE="$SSH_DIR/id_ed25519_${TOOL_NAME}"
+        if [ ! -f "$SSH_KEY_FILE" ]; then
+            echo "未找到 SSH 私钥文件，需要先运行 restoressh 命令设置 SSH 密钥"
+            echo "正在自动调用 restoressh..."
+            restoressh
+            
+            # 如果 restoressh 失败，则退出
+            if [ $? -ne 0 ]; then
+                echo "SSH 密钥设置失败，无法继续"
+                # 删除可能部分创建的目录
+                [ -d "$WORK_DIR" ] && rm -rf "$WORK_DIR"
+                return 1
+            fi
+        fi
+        
         # 克隆仓库
         echo "克隆仓库: $REPO_URL"
         if ! git clone "$REPO_URL" "$WORK_DIR"; then
@@ -172,13 +189,6 @@ dev() {
     echo "  cd $WORK_DIR        # 进入工作目录"
     echo "  $0 publish          # 发布新版本"
     echo "  $0 restoressh       # 如果需要，更新 SSH 密钥"
-    
-    # 尝试使用 Windsurf 打开工作目录
-    if [ -d "/Applications/Windsurf.app" ]; then
-        echo "尝试使用 Windsurf 打开工作目录..."
-        open -a Windsurf "$WORK_DIR"
-        return 0
-    fi
     
     # 打开编辑器（如果有）
     if [ -n "$EDITOR" ]; then
