@@ -19,7 +19,7 @@
 - 使用编译优化和符号剥离增加逆向难度
 
 ```bash
-swiftc -O -whole-module-optimization -strip-debug-symbols helper.swift -o helper
+swiftc -O -whole-module-optimization -strip-debug-symbols core.swift -o core
 ```
 
 Swift 是苹果官方语言，在 macOS 上有最佳支持，适合开发 Homebrew 工具。虽然 Swift 二进制文件可以被反编译，但难度相对较高，特别是经过优化和符号剥离后。
@@ -40,7 +40,7 @@ TOOL_NAME="template"
 VERSION="v1.0.60"
 
 # 定位 Swift 二进制文件
-HELPER_PATH="$(brew --prefix)/opt/template/libexec/helper"
+HELPER_PATH="$(brew --prefix)/opt/template/libexec/core"
 
 # 检查二进制文件是否存在
 if [ ! -f "$HELPER_PATH" ]; then
@@ -69,9 +69,9 @@ class Template < Formula
 
   def install
     bin.install "template"  # shell 脚本入口
-    libexec.install "helper"  # Swift 编译的二进制
+    libexec.install "core"  # Swift 编译的二进制
     # 确保权限正确
-    chmod 0755, libexec/"helper"
+    chmod 0755, libexec/"core"
   end
 
   test do
@@ -155,7 +155,7 @@ main()
 
 # 编译 Swift 程序
 echo "编译 Swift 程序..."
-swiftc -O -whole-module-optimization -strip-debug-symbols helper.swift -o helper
+swiftc -O -whole-module-optimization -strip-debug-symbols core.swift -o core
 
 # 更新版本号
 VERSION="v1.0.61"
